@@ -1,41 +1,26 @@
 #include "jvm.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
+// Constant pool tags
+#define CONSTANT_Class              7
+#define CONSTANT_Fieldref          9
+#define CONSTANT_Methodref         10
+#define CONSTANT_InterfaceMethodref 11
+#define CONSTANT_String            8
+#define CONSTANT_Integer           3
+#define CONSTANT_Float             4
+#define CONSTANT_Long              5
+#define CONSTANT_Double            6
+#define CONSTANT_NameAndType       12
+#define CONSTANT_Utf8              1
+#define CONSTANT_MethodHandle      15
+#define CONSTANT_MethodType        16
+#define CONSTANT_InvokeDynamic     18
+
+void jvm_load_class(JVM *jvm, const char *class_file);
 void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size);
-
-void jvm_load_class(JVM *jvm, const char *class_file) {
-    FILE *file = fopen(class_file, "rb");
-    if (file == NULL) {
-        fprintf(stderr, "Erro ao abrir arquivo: %s\n", class_file);
-        return;
-    }
-
-    fseek(file, 0, SEEK_END);
-    long file_size = ftell(file);
-    fseek(file, 0, SEEK_SET);
-
-    uint8_t *buffer = (uint8_t *)malloc(file_size);
-    if (buffer == NULL) {
-        fprintf(stderr, "Erro de alocacao de memoria\n");
-        fclose(file);
-        return;
-    }
-
-    size_t read_size = fread(buffer, 1, file_size, file);
-    if (read_size != file_size) {
-        fprintf(stderr, "Erro ao ler arquivo: %s\n", class_file);
-        free(buffer);
-        fclose(file);
-        return;
-    }
-
-    // Parse the class file
-    parse_class_file(jvm, buffer, file_size);
-
-    free(buffer);
-    fclose(file);
-}
 
 void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size) {
     // Declaração de uma estrutura ClassFile para armazenar os dados do arquivo de classe
@@ -47,16 +32,25 @@ void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size) {
     class_file.magic = (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
     ptr += 4;
 
+    printf("Magic number: 0x%08x\n", class_file.magic);
+    if (class_file.magic != 0xCAFEBABE) {
+        fprintf(stderr, "Invalid class file magic number\n");
+        return;
+    }
+
     // Lê a versão menor (2 bytes) do arquivo de classe
     class_file.minor_version = (ptr[0] << 8) | ptr[1];
     ptr += 2;
+    printf("Minor version: %d\n", class_file.minor_version);
 
     // Lê a versão maior (2 bytes) do arquivo de classe
     class_file.major_version = (ptr[0] << 8) | ptr[1];
     ptr += 2;
+    printf("Major version: %d\n", class_file.major_version);
 
     // Lê a contagem do pool de constantes (2 bytes)
     class_file.constant_pool_count = (ptr[0] << 8) | ptr[1];
+     printf("Constant pool count: %d\n", class_file.constant_pool_count);
     ptr += 2;
 
     // Aloca memória para o pool de constantes
@@ -65,7 +59,75 @@ void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size) {
         // Lê o tag do pool de constantes
         class_file.constant_pool[i].tag = *ptr++;
         // Parseia as entradas do pool de constantes com base no tag
+        printf("Parsing constant pool entry %d with tag %d\n", i + 1, class_file.constant_pool[i].tag);
+        
+        switch (class_file.constant_pool[i].tag) {
+            case CONSTANT_Class:
+                class_file.constant_pool[i].info.Class.name_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                break;
+
+            case CONSTANT_Utf8: {
+                uint16_t length = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                class_file.constant_pool[i].info.Utf8.length = length;
+                class_file.constant_pool[i].info.Utf8.bytes = malloc(length + 1);
+                memcpy(class_file.constant_pool[i].info.Utf8.bytes, ptr, length);
+                class_file.constant_pool[i].info.Utf8.bytes[length] = '\0';
+                ptr += length;
+                break;
+            }
+
+            case CONSTANT_Methodref:
+                class_file.constant_pool[i].info.Methodref.class_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                class_file.constant_pool[i].info.Methodref.name_and_type_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                printf("Methodref: class_index=%d, name_and_type_index=%d\n", 
+                    class_file.constant_pool[i].info.Methodref.class_index,
+                    class_file.constant_pool[i].info.Methodref.name_and_type_index);
+                break;
+
+            case CONSTANT_Integer: {
+                class_file.constant_pool[i].info.Integer.bytes = (ptr[0] << 24) | (ptr[1] << 16) | 
+                                                                (ptr[2] << 8) | ptr[3];
+                ptr += 4;
+                break;
+            }
+
+            case CONSTANT_Fieldref:{
+                class_file.constant_pool[i].info.Fieldref.class_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                class_file.constant_pool[i].info.Fieldref.name_and_type_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                break;
+            }
+
+            case CONSTANT_NameAndType: {
+                class_file.constant_pool[i].info.NameAndType.name_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                class_file.constant_pool[i].info.NameAndType.descriptor_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                break;
+            }
+
+            case CONSTANT_String: {
+                class_file.constant_pool[i].info.String.string_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                break;
+            }
+
+            default:
+                fprintf(stderr, "Unknown constant pool tag: %d\n", class_file.constant_pool[i].tag);
+                return;
+        }
     }
+
+    //check for reasonable constant pool count
+    if (class_file.constant_pool_count <= 0 || class_file.constant_pool_count > 65535) {
+        fprintf(stderr, "Invalid constant pool count: %d\n", class_file.constant_pool_count);
+        return;
+    }  
 
     // Lê os flags de acesso (2 bytes)
     class_file.access_flags = (ptr[0] << 8) | ptr[1];
@@ -202,6 +264,44 @@ void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size) {
 
     // Armazena a estrutura ClassFile no campo class_file da JVM
     jvm->class_file = class_file;
+}
+
+void jvm_load_class(JVM *jvm, const char *class_file) {
+    printf("Loading class file: %s\n", class_file);
+    FILE *file = fopen(class_file, "rb");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening file: %s\n", class_file);
+        perror("Error");
+        return;
+    }
+    printf("File opened successfully\n");
+
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    printf("File size: %ld bytes\n", file_size);
+    fseek(file, 0, SEEK_SET);
+
+    uint8_t *buffer = (uint8_t *)malloc(file_size);
+    if (buffer == NULL) {
+        fprintf(stderr, "Memory allocation error\n");
+        fclose(file);
+        return;
+    }
+    printf("Buffer allocated\n");
+
+    size_t read_size = fread(buffer, 1, file_size, file);
+    if (read_size != file_size) {
+        fprintf(stderr, "Erro ao ler arquivo: %s\n", class_file);
+        free(buffer);
+        fclose(file);
+        return;
+    }
+
+    // Parse the class file
+    parse_class_file(jvm, buffer, file_size);
+
+    free(buffer);
+    fclose(file);
 }
 
 void parse_constant_pool(ClassFile *class_file, uint8_t *buffer, uint16_t constant_pool_count) {

@@ -109,11 +109,12 @@ void *resolve_bootstrap_method(JVM *jvm, uint16_t bootstrap_method_attr_index, u
 }
 
 void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
+    printf("Starting bytecode execution\n");
     OperandStack operand_stack = { .top = 0 };
 
     for (uint32_t pc = 0; pc < bytecode_length; ) {
         uint8_t opcode = bytecode[pc++];
-        printf("Executing opcode: 0x%02x at pc: %u\n", opcode, pc);
+        printf("Executing opcode: 0x%02x\n", bytecode[pc]);
         switch (opcode) {
             case NOP:
                 // Do nothing
