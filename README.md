@@ -40,19 +40,24 @@
 - ⚠️ Coletor de lixo
 
 ## Como Compilar e Executar
-bash
+```bash
 make clean
 make
+```
 
 Compile o arquivo Java de teste
+```
 javac Test.java
+```
 
 Execute a JVM com o arquivo compilado
+```
 ./bin/jvm Test.class
-
+```
 
 ### Estrutura do Projeto
-JVM/
+
+```JVM/
 ├── src/
 │   ├── [main.c](http://_vscodecontentref_/2)         (Ponto de entrada)
 │   ├── [class_loader.c](http://_vscodecontentref_/3) (Parser de arquivos .class)
@@ -61,13 +66,14 @@ JVM/
 ├── include/
 │   └── [jvm.h](http://_vscodecontentref_/6)         (Arquivo de cabeçalho principal)
 └── [Test.java](http://_vscodecontentref_/7) 
+```
 
 ### Estado do Desenvolvimento
 O projeto atualmente implementa uma JVM básica capaz de executar operações aritméticas simples. 
 O carregador de classes está funcional e o interpretador pode executar um conjunto limitado de instruções bytecode.
 
 ### Exemplo de Código Suportado
-
+```
 public class Test {
     public static void main(String[] args) {
         int a = 5;
@@ -78,7 +84,7 @@ public class Test {
         int quot = b / a;   // Suporta IDIV
     }
 }
-
+```
 ### Limitações Atuais
 
 Não suporta System.out.println()
