@@ -126,6 +126,7 @@ typedef struct {
 
 
 typedef enum {
+   // Constants
     NOP = 0x00,
     ACONST_NULL = 0x01,
     ICONST_M1 = 0x02,
@@ -142,24 +143,38 @@ typedef enum {
     FCONST_2 = 0x0D,
     DCONST_0 = 0x0E,
     DCONST_1 = 0x0F,
+    
+    // Push values
     BIPUSH = 0x10,
     SIPUSH = 0x11,
+    
+    // Loads
     ILOAD = 0x15,
     LLOAD = 0x16,
     FLOAD = 0x17,
     DLOAD = 0x18,
+    
+    // Stores
     ISTORE = 0x36,
     LSTORE = 0x37,
     FSTORE = 0x38,
     DSTORE = 0x39,
+    
+    // Stack
     POP = 0x57,
     DUP = 0x59,
+    
+    // Math operations
     IADD = 0x60,
     ISUB = 0x64,
     IMUL = 0x68,
     IDIV = 0x6C,
+    IOR = 0x80,
+    
+    // Method invocation
     INVOKEDYNAMIC = 0xBA
 } Bytecode;
+
 void jvm_init(JVM *jvm);
 void jvm_load_class(JVM *jvm, const char *class_file);
 void jvm_execute(JVM *jvm);

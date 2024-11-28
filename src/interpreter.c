@@ -116,6 +116,7 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
         uint8_t opcode = bytecode[pc++];
         printf("Executing opcode: 0x%02x\n", bytecode[pc]);
         switch (opcode) {
+            // Constants
             case NOP:
                 // Do nothing
                 break;
@@ -143,6 +144,29 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
             case ICONST_5:
                 operand_stack_push(&operand_stack, 5); // Push 5 onto the operand stack
                 break;
+            case LCONST_0:
+                operand_stack_push(&operand_stack, 0L); // Push the long 0 onto the operand stack
+                break;
+            case LCONST_1:
+                operand_stack_push(&operand_stack, 1L); // Push the long 1 onto the operand stack
+                break;
+            case FCONST_0:
+                operand_stack_push(&operand_stack, 0.0f); // Push the float 0.0 onto the operand stack
+                break;
+            case FCONST_1:
+                operand_stack_push(&operand_stack, 1.0f); // Push the float 1.0 onto the operand stack
+                break;
+            case FCONST_2:
+                operand_stack_push(&operand_stack, 2.0f); // Push the float 2.0 onto the operand stack
+                break;
+            case DCONST_0:
+                operand_stack_push(&operand_stack, 0.0); // Push the double 0.0 onto the operand stack
+                break;
+            case DCONST_1:
+                operand_stack_push(&operand_stack, 1.0); // Push the double 1.0 onto the operand stack
+                break;
+
+            // Push values
             case BIPUSH: {
                 int8_t byte = bytecode[pc++];
                 operand_stack_push(&operand_stack, byte); // Push a byte onto the operand stack
@@ -154,6 +178,8 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push(&operand_stack, value); // Push a short onto the operand stack
                 break;
             }
+
+            // Loads
             case ILOAD: {
                 uint8_t index = bytecode[pc++];
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load an int from a local variable
@@ -174,6 +200,8 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load a double from a local variable
                 break;
             }
+
+            // Stores
             case ISTORE: {
                 uint8_t index = bytecode[pc++];
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store an int into a local variable
@@ -194,6 +222,8 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
                 break;
             }
+
+            // Stack
             case POP:
                 operand_stack_pop(&operand_stack); // Pop the top of the operand stack
                 break;
@@ -203,6 +233,8 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push(&operand_stack, value); // Duplicate the top of the operand stack
                 break;
             }
+
+            // Math operations
             case IADD: {
                 int32_t value2 = operand_stack_pop(&operand_stack);
                 int32_t value1 = operand_stack_pop(&operand_stack);
@@ -231,27 +263,14 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push(&operand_stack, value1 / value2); // Divide two ints
                 break;
             }
-            case LCONST_0:
-                operand_stack_push(&operand_stack, 0L); // Push the long 0 onto the operand stack
+            case IOR: {
+                int32_t value2 = operand_stack_pop(&operand_stack);
+                int32_t value1 = operand_stack_pop(&operand_stack);
+                operand_stack_push(&operand_stack, value1 | value2); // Bitwise OR of two integers
                 break;
-            case LCONST_1:
-                operand_stack_push(&operand_stack, 1L); // Push the long 1 onto the operand stack
-                break;
-            case FCONST_0:
-                operand_stack_push(&operand_stack, 0.0f); // Push the float 0.0 onto the operand stack
-                break;
-            case FCONST_1:
-                operand_stack_push(&operand_stack, 1.0f); // Push the float 1.0 onto the operand stack
-                break;
-            case FCONST_2:
-                operand_stack_push(&operand_stack, 2.0f); // Push the float 2.0 onto the operand stack
-                break;
-            case DCONST_0:
-                operand_stack_push(&operand_stack, 0.0); // Push the double 0.0 onto the operand stack
-                break;
-            case DCONST_1:
-                operand_stack_push(&operand_stack, 1.0); // Push the double 1.0 onto the operand stack
-                break;
+            }
+
+            // Method invocation
             case INVOKEDYNAMIC: {
                 printf("INVOKEDYNAMIC bytecode executed\n");
                 uint16_t index = (bytecode[pc] << 8) | bytecode[pc + 1];
