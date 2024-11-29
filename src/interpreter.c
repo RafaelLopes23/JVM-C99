@@ -185,6 +185,24 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load an int from a local variable
                 break;
             }
+            case ILOAD_0: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[0]); // Load an int from a local variable
+                break;
+            }case ILOAD_1: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[1]); // Load an int from a local variable
+                break;
+            }case ILOAD_2: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[2]); // Load an int from a local variable
+                break;
+            }case ILOAD_3: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[3]); // Load an int from a local variable
+                break;
+            }
+
             case LLOAD: {
                 uint8_t index = bytecode[pc++];
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load a long from a local variable
@@ -201,12 +219,34 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 break;
             }
 
+
             // Stores
             case ISTORE: {
                 uint8_t index = bytecode[pc++];
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store an int into a local variable
                 break;
             }
+            case ISTORE_0: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[0] = operand_stack_pop(&operand_stack); // Store an int into a local variable
+                break;
+            }
+            case ISTORE_1: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[1] = operand_stack_pop(&operand_stack); // Store an int into a local variable
+                break;
+            }
+            case ISTORE_2: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[2] = operand_stack_pop(&operand_stack); // Store an int into a local variable
+                break;
+            }
+            case ISTORE_3: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[3] = operand_stack_pop(&operand_stack); // Store an int into a local variable
+                break;
+            }
+
             case LSTORE: {
                 uint8_t index = bytecode[pc++];
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a long into a local variable
@@ -217,11 +257,35 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a float into a local variable
                 break;
             }
+            
             case DSTORE: {
+                // todo ensure it pops/stores 64 bits
                 uint8_t index = bytecode[pc++];
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
                 break;
             }
+            case DSTORE_0: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
+                break;
+            }
+            case DSTORE_1: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
+                break;
+            }
+            case DSTORE_2: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
+                break;
+            }
+            case DSTORE_3: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
+                break;
+            }
+
+
 
             // Stack
             case POP:
