@@ -159,7 +159,12 @@ typedef enum {
 
     LLOAD = 0x16,
     FLOAD = 0x17,
+    // todo: test
     DLOAD = 0x18,
+    DLOAD_0 = 0x26,
+    DLOAD_1 = 0x27,
+    DLOAD_2 = 0x28,
+    DLOAD_3 = 0x29,
 
 
     // Stores
@@ -195,7 +200,10 @@ typedef enum {
     DADD = 0x63,
     
     // Method invocation
-    INVOKEDYNAMIC = 0xBA
+    INVOKEDYNAMIC = 0xBA,
+
+    // Return
+    IRETURN = 0xB1,
 } Bytecode;
 
 void jvm_init(JVM *jvm);

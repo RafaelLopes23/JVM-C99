@@ -4,7 +4,8 @@ public class cat2test {
         double sum = 0; // DCONST_0
 
         // Test Math Operations 
-        sum = sum + 1;    // DADD
+        sum = sum + sum;    // DADD
+        System.out.println(sum);
     }
 }
 

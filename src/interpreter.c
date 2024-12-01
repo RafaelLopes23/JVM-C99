@@ -246,7 +246,7 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[3]); // Load an int from a local variable
                 break;
             }
-
+// todo: fix these cat2 to load 2 of 32 bits
             case LLOAD: {
                 uint8_t index = bytecode[pc++];
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load a long from a local variable
@@ -262,7 +262,22 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load a double from a local variable
                 break;
             }
-
+            case DLOAD_0: {
+                uint8_t index = bytecode[pc++];
+                Cat2 val;
+                val.high = jvm->jvm_stack.stack[0];
+                val.low = jvm->jvm_stack.stack[1]; // todo: test if these are indeed  the low and high bytes
+                operand_stack_push_cat2(&operand_stack, val); 
+                break;
+            }
+            case DLOAD_1: {
+                uint8_t index = bytecode[pc++];
+                Cat2 val;
+                val.high = jvm->jvm_stack.stack[1];
+                val.low = jvm->jvm_stack.stack[2]; // todo: test if these are indeed  the low and high bytes
+                operand_stack_push_cat2(&operand_stack, val); 
+                break;
+            }
 
             // Stores
             case ISTORE: {
@@ -401,6 +416,12 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 invoke_method(jvm, target_method_handle);
                 break;
             }
+
+            // Return
+            case IRETURN: {
+                return;
+            }
+
             // Add more bytecode instructions as needed
             default:
                 fprintf(stderr, "Unknown bytecode instruction: 0x%02x\n", opcode);
