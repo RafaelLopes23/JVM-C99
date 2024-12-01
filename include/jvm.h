@@ -191,6 +191,8 @@ typedef enum {
     IMUL = 0x68,
     IDIV = 0x6C,
     IOR = 0x80,
+
+    DADD = 0x63,
     
     // Method invocation
     INVOKEDYNAMIC = 0xBA
@@ -204,5 +206,17 @@ void stack_push(JVMStack *stack, int32_t value);
 int32_t stack_pop(JVMStack *stack);
 
 void invoke_method(JVM *jvm, void *method_handle);
+
+// unions for bytecode operands
+typedef union {
+    struct{
+        uint32_t low;
+        uint32_t high;
+    };
+	int32_t int_;
+    uint64_t    bytes_;
+    int64_t  long_;
+    double    double_;
+} Cat2;
 
 #endif // JVM_H

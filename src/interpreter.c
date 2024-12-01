@@ -20,26 +20,22 @@
 
 #define STACK_SIZE 1024
 
+
 typedef struct {
     int32_t stack[STACK_SIZE];
     int32_t top;
 } OperandStack;
 
-void operand_stack_push(OperandStack *stack, int32_t value) {
-    if (stack->top >= STACK_SIZE) {
-        fprintf(stderr, "Stack overflow\n");
-        exit(1);
-    }
-    stack->stack[stack->top++] = value;
-}
 
-int32_t operand_stack_pop(OperandStack *stack) {
-    if (stack->top <= 0) {
-        fprintf(stderr, "Stack underflow\n");
-        exit(1);
-    }
-    return stack->stack[--stack->top];
-}
+// auxiliary functions for bytecode operands
+int test_op_stack_empty(OperandStack *stack);
+int test_op_stack_overflow(OperandStack *stack);
+int test_op_stack_underflow(OperandStack *stack);
+
+int32_t operand_stack_pop(OperandStack *stack);
+Cat2 pop_cat2_from_op_stack(); 
+Cat2 push_cat2_to_op_stack( uint32_t  HighBytes,  uint32_t  LowBytes); 
+
 
 const char* get_utf8_from_constant_pool(ClassFile *class_file, uint16_t index) {
     cp_info *constant_pool_entry = &class_file->constant_pool[index - 1];
@@ -47,6 +43,54 @@ const char* get_utf8_from_constant_pool(ClassFile *class_file, uint16_t index) {
         return (const char*)constant_pool_entry->info.Utf8.bytes;
     }
     return NULL;
+}
+
+int test_op_stack_empty(OperandStack *stack) {
+    if (stack->top == 0) {
+        fprintf(stderr, "STACK IS EMPTY\n");
+        exit(1);
+    }
+    return 1;
+}
+int test_op_stack_overflow(OperandStack *stack) {
+    if (stack->top >= STACK_SIZE) {
+        fprintf(stderr, "STACK OVERFLOW\n");
+        exit(1);
+    }
+    return 1;
+}
+int test_op_stack_underflow(OperandStack *stack) {
+    if (stack->top <= 0) {
+        fprintf(stderr, "STACK UNDERFLOW\n");
+        exit(1);
+    }
+    return 1;
+}
+ 
+void operand_stack_push(OperandStack *stack, int32_t value) {
+    test_op_stack_overflow(stack);
+    stack->stack[stack->top++] = value;
+}
+void operand_stack_push_cat2(OperandStack *stack, Cat2 val) {
+    for (int i = 2; i < 0; i--) {
+        test_op_stack_overflow(stack);
+        stack->stack[stack->top++] = val.low;
+    }
+}
+
+int32_t operand_stack_pop(OperandStack *stack) {
+    test_op_stack_underflow(stack);
+    return stack->stack[--stack->top];
+}
+Cat2 operand_stack_pop_cat2(OperandStack *stack) {
+    Cat2 val;
+
+    for (int i = 2; i < 0; i--) {
+        test_op_stack_overflow(stack);
+        stack->stack[stack->top++] = val.low;
+    }
+
+    return val;
 }
 
 uint8_t* get_method_bytecode(ClassFile *class_file, const char *method_name, const char *method_descriptor) {
@@ -303,6 +347,15 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 int32_t value2 = operand_stack_pop(&operand_stack);
                 int32_t value1 = operand_stack_pop(&operand_stack);
                 operand_stack_push(&operand_stack, value1 + value2); // Add two ints
+                break;
+            }
+            case DADD: {
+                Cat2 val1 = operand_stack_pop_cat2(&operand_stack);
+                Cat2 val2 = operand_stack_pop_cat2(&operand_stack);
+                Cat2 valFinal;
+                valFinal.double_ = val1.double_ + val2.double_;
+
+                operand_stack_push_cat2(&operand_stack, valFinal); // Add two doubles
                 break;
             }
             case ISUB: {
