@@ -26,6 +26,11 @@ public class Test {
         int quot = a / b;   // IDIV
         int or = a | b;     // IOR
 
+        //double dsum = 0; // DCONST_0
+
+        //double d_a = 5;      // 
+        //double d_b = 3;      // 
+
         // Print results
         System.out.println("a: " + a);
         System.out.println("b: " + b);
@@ -42,5 +47,8 @@ public class Test {
         System.out.println("prod: " + prod);
         System.out.println("quot: " + quot);
         System.out.println("or: " + or);
+        //System.out.println("dsum: " + dsum);
+        //System.out.println("d_a: " + d_a);
+        //System.out.println("d_b: " + d_b);
     }
 }
