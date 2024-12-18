@@ -2,6 +2,7 @@
 #define JVM_H
 
 #include <stdint.h>
+#include <stdlib.h>
 
 typedef struct {
     uint8_t tag;
@@ -149,16 +150,41 @@ typedef enum {
     SIPUSH = 0x11,
     
     // Loads
-    ILOAD = 0x15,
+    ILOAD = 0X15,
+    // TODO: test
+    ILOAD_0 = 0x1A,
+    ILOAD_1 = 0x1B,
+    ILOAD_2 = 0x1C,
+    ILOAD_3 = 0x1D,
+
     LLOAD = 0x16,
     FLOAD = 0x17,
+    // todo: test
     DLOAD = 0x18,
-    
+    DLOAD_0 = 0x26,
+    DLOAD_1 = 0x27,
+    DLOAD_2 = 0x28,
+    DLOAD_3 = 0x29,
+
+
     // Stores
     ISTORE = 0x36,
+    // TODO: test
+    ISTORE_0 = 0x3B,
+    ISTORE_1 = 0x3C,
+    ISTORE_2 = 0x3D,
+    ISTORE_3 = 0x3E, 
+
     LSTORE = 0x37,
     FSTORE = 0x38,
+
+// TODO: implement, prepare for 64 bits manipulation
     DSTORE = 0x39,
+    DSTORE_0 = 0x47,
+    DSTORE_1 = 0x48,
+    DSTORE_2 = 0x49,
+    DSTORE_3 = 0x4a, 
+
     
     // Stack
     POP = 0x57,
@@ -170,9 +196,14 @@ typedef enum {
     IMUL = 0x68,
     IDIV = 0x6C,
     IOR = 0x80,
+
+    DADD = 0x63,
     
     // Method invocation
-    INVOKEDYNAMIC = 0xBA
+    INVOKEDYNAMIC = 0xBA,
+
+    // Return
+    IRETURN = 0xB1,
 } Bytecode;
 
 void jvm_init(JVM *jvm);
@@ -183,5 +214,17 @@ void stack_push(JVMStack *stack, int32_t value);
 int32_t stack_pop(JVMStack *stack);
 
 void invoke_method(JVM *jvm, void *method_handle);
+
+// unions for bytecode operands
+typedef union {
+    struct{
+        uint32_t low;
+        uint32_t high;
+    };
+	int32_t int_;
+    uint64_t    bytes_;
+    int64_t  long_;
+    double    double_;
+} Cat2;
 
 #endif // JVM_H

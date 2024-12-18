@@ -20,26 +20,22 @@
 
 #define STACK_SIZE 1024
 
+
 typedef struct {
     int32_t stack[STACK_SIZE];
     int32_t top;
 } OperandStack;
 
-void operand_stack_push(OperandStack *stack, int32_t value) {
-    if (stack->top >= STACK_SIZE) {
-        fprintf(stderr, "Stack overflow\n");
-        exit(1);
-    }
-    stack->stack[stack->top++] = value;
-}
 
-int32_t operand_stack_pop(OperandStack *stack) {
-    if (stack->top <= 0) {
-        fprintf(stderr, "Stack underflow\n");
-        exit(1);
-    }
-    return stack->stack[--stack->top];
-}
+// auxiliary functions for bytecode operands
+int test_op_stack_empty(OperandStack *stack);
+int test_op_stack_overflow(OperandStack *stack);
+int test_op_stack_underflow(OperandStack *stack);
+
+int32_t operand_stack_pop(OperandStack *stack);
+Cat2 pop_cat2_from_op_stack(); 
+Cat2 push_cat2_to_op_stack( uint32_t  HighBytes,  uint32_t  LowBytes); 
+
 
 const char* get_utf8_from_constant_pool(ClassFile *class_file, uint16_t index) {
     cp_info *constant_pool_entry = &class_file->constant_pool[index - 1];
@@ -47,6 +43,54 @@ const char* get_utf8_from_constant_pool(ClassFile *class_file, uint16_t index) {
         return (const char*)constant_pool_entry->info.Utf8.bytes;
     }
     return NULL;
+}
+
+int test_op_stack_empty(OperandStack *stack) {
+    if (stack->top == 0) {
+        fprintf(stderr, "STACK IS EMPTY\n");
+        exit(1);
+    }
+    return 1;
+}
+int test_op_stack_overflow(OperandStack *stack) {
+    if (stack->top >= STACK_SIZE) {
+        fprintf(stderr, "STACK OVERFLOW\n");
+        exit(1);
+    }
+    return 1;
+}
+int test_op_stack_underflow(OperandStack *stack) {
+    if (stack->top <= 0) {
+        fprintf(stderr, "STACK UNDERFLOW\n");
+        exit(1);
+    }
+    return 1;
+}
+ 
+void operand_stack_push(OperandStack *stack, int32_t value) {
+    test_op_stack_overflow(stack);
+    stack->stack[stack->top++] = value;
+}
+void operand_stack_push_cat2(OperandStack *stack, Cat2 val) {
+    for (int i = 2; i < 0; i--) {
+        test_op_stack_overflow(stack);
+        stack->stack[stack->top++] = val.low;
+    }
+}
+
+int32_t operand_stack_pop(OperandStack *stack) {
+    test_op_stack_underflow(stack);
+    return stack->stack[--stack->top];
+}
+Cat2 operand_stack_pop_cat2(OperandStack *stack) {
+    Cat2 val;
+
+    for (int i = 2; i < 0; i--) {
+        test_op_stack_overflow(stack);
+        stack->stack[stack->top++] = val.low;
+    }
+
+    return val;
 }
 
 uint8_t* get_method_bytecode(ClassFile *class_file, const char *method_name, const char *method_descriptor) {
@@ -185,6 +229,24 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load an int from a local variable
                 break;
             }
+            case ILOAD_0: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[0]); // Load an int from a local variable
+                break;
+            }case ILOAD_1: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[1]); // Load an int from a local variable
+                break;
+            }case ILOAD_2: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[2]); // Load an int from a local variable
+                break;
+            }case ILOAD_3: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[3]); // Load an int from a local variable
+                break;
+            }
+// todo: fix these cat2 to load 2 of 32 bits
             case LLOAD: {
                 uint8_t index = bytecode[pc++];
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load a long from a local variable
@@ -200,6 +262,22 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load a double from a local variable
                 break;
             }
+            case DLOAD_0: {
+                uint8_t index = bytecode[pc++];
+                Cat2 val;
+                val.high = jvm->jvm_stack.stack[0];
+                val.low = jvm->jvm_stack.stack[1]; // todo: test if these are indeed  the low and high bytes
+                operand_stack_push_cat2(&operand_stack, val); 
+                break;
+            }
+            case DLOAD_1: {
+                uint8_t index = bytecode[pc++];
+                Cat2 val;
+                val.high = jvm->jvm_stack.stack[1];
+                val.low = jvm->jvm_stack.stack[2]; // todo: test if these are indeed  the low and high bytes
+                operand_stack_push_cat2(&operand_stack, val); 
+                break;
+            }
 
             // Stores
             case ISTORE: {
@@ -207,6 +285,27 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store an int into a local variable
                 break;
             }
+            case ISTORE_0: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[0] = operand_stack_pop(&operand_stack); // Store an int into a local variable
+                break;
+            }
+            case ISTORE_1: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[1] = operand_stack_pop(&operand_stack); // Store an int into a local variable
+                break;
+            }
+            case ISTORE_2: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[2] = operand_stack_pop(&operand_stack); // Store an int into a local variable
+                break;
+            }
+            case ISTORE_3: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[3] = operand_stack_pop(&operand_stack); // Store an int into a local variable
+                break;
+            }
+
             case LSTORE: {
                 uint8_t index = bytecode[pc++];
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a long into a local variable
@@ -217,11 +316,35 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a float into a local variable
                 break;
             }
+            
             case DSTORE: {
+                // todo ensure it pops/stores 64 bits
                 uint8_t index = bytecode[pc++];
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
                 break;
             }
+            case DSTORE_0: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
+                break;
+            }
+            case DSTORE_1: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
+                break;
+            }
+            case DSTORE_2: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
+                break;
+            }
+            case DSTORE_3: {
+                uint8_t index = bytecode[pc++];
+                jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store a double into a local variable
+                break;
+            }
+
+
 
             // Stack
             case POP:
@@ -239,6 +362,15 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 int32_t value2 = operand_stack_pop(&operand_stack);
                 int32_t value1 = operand_stack_pop(&operand_stack);
                 operand_stack_push(&operand_stack, value1 + value2); // Add two ints
+                break;
+            }
+            case DADD: {
+                Cat2 val1 = operand_stack_pop_cat2(&operand_stack);
+                Cat2 val2 = operand_stack_pop_cat2(&operand_stack);
+                Cat2 valFinal;
+                valFinal.double_ = val1.double_ + val2.double_;
+
+                operand_stack_push_cat2(&operand_stack, valFinal); // Add two doubles
                 break;
             }
             case ISUB: {
@@ -284,6 +416,12 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 invoke_method(jvm, target_method_handle);
                 break;
             }
+
+            // Return
+            case IRETURN: {
+                return;
+            }
+
             // Add more bytecode instructions as needed
             default:
                 fprintf(stderr, "Unknown bytecode instruction: 0x%02x\n", opcode);
