@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -g
+CFLAGS = -Wall -g -std=c99 -Iinclude
 INCLUDES = -Iinclude
 SRC = src
 OBJ = obj
