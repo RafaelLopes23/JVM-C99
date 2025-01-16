@@ -452,21 +452,32 @@ void invoke_method(JVM *jvm, void *method_handle) {
 
 void jvm_execute(JVM *jvm) {
     printf("Executing JVM\n");
-    // Fetch the main method from the class file
     ClassFile *class_file = &jvm->class_file;
     method_info *main_method = NULL;
-    const char *main_method_name = "main";
-    const char *main_method_descriptor = "([Ljava/lang/String;)V";
+
+    // Debug print to see all methods
     for (int i = 0; i < class_file->methods_count; i++) {
         const char *method_name = get_constant_pool_string(class_file, class_file->methods[i].name_index);
         const char *method_descriptor = get_constant_pool_string(class_file, class_file->methods[i].descriptor_index);
-        if (method_name && method_descriptor &&
-            strcmp(method_name, main_method_name) == 0 &&
-            strcmp(method_descriptor, main_method_descriptor) == 0) {
-            main_method = &class_file->methods[i];
-            break;
+        printf("Found method: %s with descriptor: %s\n", method_name, method_descriptor);
+    }
+
+    // Look for main method
+    for (int i = 0; i < class_file->methods_count; i++) {
+        const char *method_name = get_constant_pool_string(class_file, class_file->methods[i].name_index);
+        const char *method_descriptor = get_constant_pool_string(class_file, class_file->methods[i].descriptor_index);
+        
+        if (method_name && method_descriptor) {
+            printf("Checking method: %s with descriptor: %s\n", method_name, method_descriptor);
+            if (strcmp(method_name, "main") == 0 &&
+                strcmp(method_descriptor, "([Ljava/lang/String;)V") == 0) {
+                main_method = &class_file->methods[i];
+                printf("Found main method!\n");
+                break;
+            }
         }
     }
+
     if (main_method == NULL) {
         fprintf(stderr, "Main method not found\n");
         return;
