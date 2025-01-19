@@ -72,10 +72,11 @@ void operand_stack_push(OperandStack *stack, int32_t value) {
     stack->stack[stack->top++] = value;
 }
 void operand_stack_push_cat2(OperandStack *stack, Cat2 val) {
-    for (int i = 2; i < 0; i--) {
-        test_op_stack_overflow(stack);
-        stack->stack[stack->top++] = val.low;
-    }
+    test_op_stack_overflow(stack);
+    stack->stack[stack->top++] = val.low;
+
+    test_op_stack_overflow(stack);
+    stack->stack[stack->top++] = val.high;
 }
 
 int32_t operand_stack_pop(OperandStack *stack) {
@@ -246,10 +247,12 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[3]); // Load an int from a local variable
                 break;
             }
-// todo: fix these cat2 to load 2 of 32 bits
-            case LLOAD: {
+       case LLOAD: {
                 uint8_t index = bytecode[pc++];
-                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load a long from a local variable
+                Cat2 val;
+                val.high = jvm->jvm_stack.stack[index];
+                val.low = jvm->jvm_stack.stack[index+1]; // todo: test if these are indeed  the low and high bytes
+                operand_stack_push_cat2(&operand_stack, val); 
                 break;
             }
             case FLOAD: {
@@ -259,22 +262,25 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
             }
             case DLOAD: {
                 uint8_t index = bytecode[pc++];
-                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[index]); // Load a double from a local variable
+                Cat2 val;
+                val.high = jvm->jvm_stack.stack[index];
+                val.low = jvm->jvm_stack.stack[index+1]; // todo: test if these are indeed  the low and high bytes
+                operand_stack_push_cat2(&operand_stack, val); 
                 break;
             }
             case DLOAD_0: {
                 uint8_t index = bytecode[pc++];
                 Cat2 val;
-                val.high = jvm->jvm_stack.stack[0];
-                val.low = jvm->jvm_stack.stack[1]; // todo: test if these are indeed  the low and high bytes
+                val.high = jvm->jvm_stack.stack[index];
+                val.low = jvm->jvm_stack.stack[index+1]; // todo: test if these are indeed  the low and high bytes
                 operand_stack_push_cat2(&operand_stack, val); 
                 break;
             }
             case DLOAD_1: {
                 uint8_t index = bytecode[pc++];
                 Cat2 val;
-                val.high = jvm->jvm_stack.stack[1];
-                val.low = jvm->jvm_stack.stack[2]; // todo: test if these are indeed  the low and high bytes
+                val.high = jvm->jvm_stack.stack[index];
+                val.low = jvm->jvm_stack.stack[index+1]; // todo: test if these are indeed  the low and high bytes
                 operand_stack_push_cat2(&operand_stack, val); 
                 break;
             }
