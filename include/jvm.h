@@ -127,6 +127,13 @@ typedef struct {
 
 
 typedef enum {
+
+    GETSTATIC = 0xB2,
+    INVOKEVIRTUAL = 0xB6,
+
+    LDC = 0x12,
+    LDC_W = 0x13,
+
    // Constants
     NOP = 0x00,
     ACONST_NULL = 0x01,
@@ -209,6 +216,7 @@ typedef enum {
 void jvm_init(JVM *jvm);
 void jvm_load_class(JVM *jvm, const char *class_file);
 void jvm_execute(JVM *jvm);
+void display_bytecode(uint8_t *bytecode, uint32_t length);
 
 void stack_push(JVMStack *stack, int32_t value);
 int32_t stack_pop(JVMStack *stack);

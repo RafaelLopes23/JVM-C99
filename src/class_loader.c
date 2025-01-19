@@ -117,9 +117,34 @@ void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size) {
                 break;
             }
 
+            case CONSTANT_InvokeDynamic:
+                class_file.constant_pool[i].info.InvokeDynamic.bootstrap_method_attr_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                class_file.constant_pool[i].info.InvokeDynamic.name_and_type_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                printf("InvokeDynamic: bootstrap_method_attr_index=%d, name_and_type_index=%d\n",
+                    class_file.constant_pool[i].info.InvokeDynamic.bootstrap_method_attr_index,
+                    class_file.constant_pool[i].info.InvokeDynamic.name_and_type_index);
+                break;
+
+            case CONSTANT_MethodHandle:
+                class_file.constant_pool[i].info.MethodHandle.reference_kind = *ptr++;
+                class_file.constant_pool[i].info.MethodHandle.reference_index = (ptr[0] << 8) | ptr[1];
+                ptr += 2;
+                break;
+
+            case CONSTANT_Double:
+                class_file.constant_pool[i].info.Double.bytes = ((uint64_t)ptr[0] << 56) | ((uint64_t)ptr[1] << 48) |
+                                                            ((uint64_t)ptr[2] << 40) | ((uint64_t)ptr[3] << 32) |
+                                                            ((uint64_t)ptr[4] << 24) | ((uint64_t)ptr[5] << 16) |
+                                                            ((uint64_t)ptr[6] << 8)  | (uint64_t)ptr[7];
+                ptr += 8;
+                i++; // Skip next entry for doubles
+                break;
+
             default:
                 fprintf(stderr, "Unknown constant pool tag: %d\n", class_file.constant_pool[i].tag);
-                return;
+                continue;
         }
     }
 
@@ -372,10 +397,14 @@ void parse_constant_pool(ClassFile *class_file, uint8_t *buffer, uint16_t consta
                 ptr += 2;
                 class_file->constant_pool[i].info.InvokeDynamic.name_and_type_index = (ptr[0] << 8) | ptr[1];
                 ptr += 2;
+                printf("InvokeDynamic: bootstrap_method_attr_index=%d, name_and_type_index=%d\n",
+                    class_file->constant_pool[i].info.InvokeDynamic.bootstrap_method_attr_index,
+                    class_file->constant_pool[i].info.InvokeDynamic.name_and_type_index);
                 break;
+
             default:
                 fprintf(stderr, "Unknown constant pool tag: %d\n", class_file->constant_pool[i].tag);
-                exit(1);
+                break;
         }
     }
 }

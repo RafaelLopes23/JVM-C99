@@ -87,7 +87,6 @@ public class Test {
 ```
 ### Limitações Atuais
 
-Não suporta System.out.println()
 Não suporta criação de objetos
 Não suporta strings
 Conjunto limitado de operações bytecode

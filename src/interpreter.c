@@ -72,11 +72,10 @@ void operand_stack_push(OperandStack *stack, int32_t value) {
     stack->stack[stack->top++] = value;
 }
 void operand_stack_push_cat2(OperandStack *stack, Cat2 val) {
-    test_op_stack_overflow(stack);
-    stack->stack[stack->top++] = val.low;
-
-    test_op_stack_overflow(stack);
-    stack->stack[stack->top++] = val.high;
+    for (int i = 2; i < 0; i--) {
+        test_op_stack_overflow(stack);
+        stack->stack[stack->top++] = val.low;
+    }
 }
 
 int32_t operand_stack_pop(OperandStack *stack) {
@@ -158,11 +157,13 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
     OperandStack operand_stack = { .top = 0 };
 
     for (uint32_t pc = 0; pc < bytecode_length; ) {
-        uint8_t opcode = bytecode[pc++];
-        printf("Executing opcode: 0x%02x\n", bytecode[pc]);
+        uint8_t opcode = bytecode[pc];
+        printf("Executing opcode: 0x%02x at pc: %d\n", opcode, pc);
+
         switch (opcode) {
             // Constants
             case NOP:
+                pc++;
                 // Do nothing
                 break;
             case ACONST_NULL:
@@ -188,6 +189,7 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 break;
             case ICONST_5:
                 operand_stack_push(&operand_stack, 5); // Push 5 onto the operand stack
+                pc++;
                 break;
             case LCONST_0:
                 operand_stack_push(&operand_stack, 0L); // Push the long 0 onto the operand stack
@@ -215,12 +217,14 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
             case BIPUSH: {
                 int8_t byte = bytecode[pc++];
                 operand_stack_push(&operand_stack, byte); // Push a byte onto the operand stack
+                pc += 2;
                 break;
             }
             case SIPUSH: {
                 int16_t value = (bytecode[pc] << 8) | bytecode[pc + 1];
                 pc += 2;
                 operand_stack_push(&operand_stack, value); // Push a short onto the operand stack
+                pc += 3;
                 break;
             }
 
@@ -231,6 +235,24 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 break;
             }
             case ILOAD_0: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[0]); // Load an int from a local variable
+                break;
+            }case ILOAD_1: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[1]); // Load an int from a local variable
+                break;
+            }case ILOAD_2: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[2]); // Load an int from a local variable
+                break;
+            }case ILOAD_3: {
+                uint8_t index = bytecode[pc++];
+                operand_stack_push(&operand_stack, jvm->jvm_stack.stack[3]); // Load an int from a local variable
+                break;
+            }
+// todo: fix these cat2 to load 2 of 32 bits
+            case LLOAD: {
                 uint8_t index = bytecode[pc++];
                 operand_stack_push(&operand_stack, jvm->jvm_stack.stack[0]); // Load an int from a local variable
                 break;
@@ -284,11 +306,28 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 operand_stack_push_cat2(&operand_stack, val); 
                 break;
             }
+            case DLOAD_0: {
+                uint8_t index = bytecode[pc++];
+                Cat2 val;
+                val.high = jvm->jvm_stack.stack[0];
+                val.low = jvm->jvm_stack.stack[1]; // todo: test if these are indeed  the low and high bytes
+                operand_stack_push_cat2(&operand_stack, val); 
+                break;
+            }
+            case DLOAD_1: {
+                uint8_t index = bytecode[pc++];
+                Cat2 val;
+                val.high = jvm->jvm_stack.stack[1];
+                val.low = jvm->jvm_stack.stack[2]; // todo: test if these are indeed  the low and high bytes
+                operand_stack_push_cat2(&operand_stack, val); 
+                break;
+            }
 
             // Stores
             case ISTORE: {
                 uint8_t index = bytecode[pc++];
                 jvm->jvm_stack.stack[index] = operand_stack_pop(&operand_stack); // Store an int into a local variable
+                pc +=2;
                 break;
             }
             case ISTORE_0: {
@@ -309,6 +348,7 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
             case ISTORE_3: {
                 uint8_t index = bytecode[pc++];
                 jvm->jvm_stack.stack[3] = operand_stack_pop(&operand_stack); // Store an int into a local variable
+                pc++;
                 break;
             }
 
@@ -405,6 +445,34 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 int32_t value2 = operand_stack_pop(&operand_stack);
                 int32_t value1 = operand_stack_pop(&operand_stack);
                 operand_stack_push(&operand_stack, value1 | value2); // Bitwise OR of two integers
+                pc++;
+                break;
+            }
+
+            case GETSTATIC: {
+                uint16_t index = (bytecode[pc] << 8) | bytecode[pc + 1];
+                pc += 2;
+                // Handle getting static field
+                break;
+            }
+
+            case INVOKEVIRTUAL: {
+                uint16_t index = (bytecode[pc] << 8) | bytecode[pc + 1];
+                pc += 3;
+                // Handle method invocation
+                break;
+            }
+
+            case LDC: {
+                uint8_t index = bytecode[pc++];
+                // Load constant from constant pool
+                break;
+            }
+
+            case LDC_W: {
+                uint16_t index = (bytecode[pc] << 8) | bytecode[pc + 1];
+                pc += 2;
+                // Load constant from constant pool (wide index)
                 break;
             }
 
@@ -412,7 +480,7 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
             case INVOKEDYNAMIC: {
                 printf("INVOKEDYNAMIC bytecode executed\n");
                 uint16_t index = (bytecode[pc] << 8) | bytecode[pc + 1];
-                pc += 2;
+                pc += 5;
                 cp_info *constant_pool = jvm->class_file.constant_pool;
                 uint16_t bootstrap_method_attr_index = constant_pool[index].info.InvokeDynamic.bootstrap_method_attr_index;
                 uint16_t name_and_type_index = constant_pool[index].info.InvokeDynamic.name_and_type_index;
@@ -430,9 +498,191 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
 
             // Add more bytecode instructions as needed
             default:
-                fprintf(stderr, "Unknown bytecode instruction: 0x%02x\n", opcode);
-                return;
+                fprintf(stderr, "Unknown bytecode instruction: 0x%02x at pc: %d\n", opcode, pc);
+                return; // Return instead of continuing with unknown instruction
         }
+        pc++; // Move to next instruction after processing current one
+    }
+}
+
+
+void display_bytecode(uint8_t *bytecode, uint32_t length) {
+    uint32_t pc = 0;
+    while (pc < length) {
+        printf("%04x: ", pc);
+        uint8_t opcode = bytecode[pc++];
+        
+        switch (opcode) {
+            // Constants
+            case NOP:
+                printf("nop");
+                break;
+            case ACONST_NULL:
+                printf("aconst_null");
+                break;
+            case ICONST_M1:
+                printf("iconst_m1");
+                break;
+            case ICONST_0:
+                printf("iconst_0");
+                break;
+            case ICONST_1:
+                printf("iconst_1");
+                break;
+            case ICONST_2:
+                printf("iconst_2");
+                break;
+            case ICONST_3:
+                printf("iconst_3");
+                break;
+            case ICONST_4:
+                printf("iconst_4");
+                break;
+            case ICONST_5:
+                printf("iconst_5");
+                break;
+            case LCONST_0:
+                printf("lconst_0");
+                break;
+            case LCONST_1:
+                printf("lconst_1");
+                break;
+            case FCONST_0:
+                printf("fconst_0");
+                break;
+            case FCONST_1:
+                printf("fconst_1");
+                break;
+            case FCONST_2:
+                printf("fconst_2");
+                break;
+            case DCONST_0:
+                printf("dconst_0");
+                break;
+            case DCONST_1:
+                printf("dconst_1");
+                break;
+
+            // Load instructions
+            case ILOAD:
+                printf("iload %d", bytecode[pc++]);
+                break;
+            case ILOAD_0:
+                printf("iload_0");
+                break;
+            case ILOAD_1:
+                printf("iload_1");
+                break;
+            case ILOAD_2:
+                printf("iload_2");
+                break;
+            case ILOAD_3:
+                printf("iload_3");
+                break;
+            case DLOAD:
+                printf("dload %d", bytecode[pc++]);
+                break;
+            case DLOAD_0:
+                printf("dload_0");
+                break;
+            case DLOAD_1:
+                printf("dload_1");
+                break;
+
+            // Store instructions
+            case ISTORE:
+                printf("istore %d", bytecode[pc++]);
+                break;
+            case ISTORE_0:
+                printf("istore_0");
+                break;
+            case ISTORE_1:
+                printf("istore_1");
+                break;
+            case ISTORE_2:
+                printf("istore_2");
+                break;
+            case ISTORE_3:
+                printf("istore_3");
+                break;
+            case DSTORE:
+                printf("dstore %d", bytecode[pc++]);
+                break;
+
+            // Stack operations
+            case POP:
+                printf("pop");
+                break;
+            case DUP:
+                printf("dup");
+                break;
+
+            // Math operations
+            case IADD:
+                printf("iadd");
+                break;
+            case ISUB:
+                printf("isub");
+                break;
+            case IMUL:
+                printf("imul");
+                break;
+            case IDIV:
+                printf("idiv");
+                break;
+            case IOR:
+                printf("ior");
+                break;
+            case DADD:
+                printf("dadd");
+                break;
+
+            // Method invocation
+            case INVOKEDYNAMIC: {
+                uint16_t index = (bytecode[pc] << 8) | bytecode[pc + 1];
+                pc += 4; // Skip 2 bytes of index and 2 bytes of padding
+                printf("invokedynamic #%d", index);
+                break;
+            }
+
+                        case GETSTATIC:
+                printf("getstatic #%d", (bytecode[pc] << 8) | bytecode[pc + 1]);
+                pc += 2;
+                break;
+
+            case INVOKEVIRTUAL:
+                printf("invokevirtual #%d", (bytecode[pc] << 8) | bytecode[pc + 1]);
+                pc += 2;
+                break;
+
+            case LDC:
+                printf("ldc #%d", bytecode[pc++]);
+                break;
+
+            case LDC_W:
+                printf("ldc_w #%d", (bytecode[pc] << 8) | bytecode[pc + 1]);
+                pc += 2;
+                break;
+
+            case SIPUSH:
+                printf("sipush %d", (int16_t)((bytecode[pc] << 8) | bytecode[pc + 1]));
+                pc += 2;
+                break;
+
+            case BIPUSH:
+                printf("bipush %d", (int8_t)bytecode[pc++]);
+                break;
+
+            // Return
+            case IRETURN:
+                printf("ireturn");
+                break;
+
+            default:
+                printf("unknown 0x%02x", opcode);
+                break;
+        }
+        printf("\n");
     }
 }
 
@@ -458,21 +708,32 @@ void invoke_method(JVM *jvm, void *method_handle) {
 
 void jvm_execute(JVM *jvm) {
     printf("Executing JVM\n");
-    // Fetch the main method from the class file
     ClassFile *class_file = &jvm->class_file;
     method_info *main_method = NULL;
-    const char *main_method_name = "main";
-    const char *main_method_descriptor = "([Ljava/lang/String;)V";
+
+    // Debug print to see all methods
     for (int i = 0; i < class_file->methods_count; i++) {
         const char *method_name = get_constant_pool_string(class_file, class_file->methods[i].name_index);
         const char *method_descriptor = get_constant_pool_string(class_file, class_file->methods[i].descriptor_index);
-        if (method_name && method_descriptor &&
-            strcmp(method_name, main_method_name) == 0 &&
-            strcmp(method_descriptor, main_method_descriptor) == 0) {
-            main_method = &class_file->methods[i];
-            break;
+        printf("Found method: %s with descriptor: %s\n", method_name, method_descriptor);
+    }
+
+    // Look for main method
+    for (int i = 0; i < class_file->methods_count; i++) {
+        const char *method_name = get_constant_pool_string(class_file, class_file->methods[i].name_index);
+        const char *method_descriptor = get_constant_pool_string(class_file, class_file->methods[i].descriptor_index);
+        
+        if (method_name && method_descriptor) {
+            printf("Checking method: %s with descriptor: %s\n", method_name, method_descriptor);
+            if (strcmp(method_name, "main") == 0 &&
+                strcmp(method_descriptor, "([Ljava/lang/String;)V") == 0) {
+                main_method = &class_file->methods[i];
+                printf("Found main method!\n");
+                break;
+            }
         }
     }
+
     if (main_method == NULL) {
         fprintf(stderr, "Main method not found\n");
         return;
@@ -493,6 +754,12 @@ void jvm_execute(JVM *jvm) {
     }
     uint8_t *bytecode = code_attribute->info;
     uint32_t bytecode_length = code_attribute->attribute_length;
+
+    printf("\nBytecode disassembly:\n");
+    printf("--------------------\n");
+    display_bytecode(bytecode, bytecode_length);
+    printf("--------------------\n\n");
+
 
     // Execute the bytecode
     execute_bytecode(jvm, bytecode, bytecode_length);
