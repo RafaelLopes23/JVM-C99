@@ -31,6 +31,14 @@ typedef struct {
 int test_op_stack_empty(OperandStack *stack);
 int test_op_stack_overflow(OperandStack *stack);
 int test_op_stack_underflow(OperandStack *stack);
+uint32_t get_index2();
+
+uint32_t get_index2(uint8_t *bytecode, uint32_t pc) {
+    //! std::cout<<"GetIndex2\n";
+    uint16_t indexByte1 = bytecode[pc++];
+    uint16_t indexByte2 = bytecode[pc++];
+    return (indexByte1 << 8) | indexByte2;
+}
 
 int32_t operand_stack_pop(OperandStack *stack);
 Cat2 pop_cat2_from_op_stack(); 
@@ -412,6 +420,92 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
                 int32_t value2 = operand_stack_pop(&operand_stack);
                 int32_t value1 = operand_stack_pop(&operand_stack);
                 operand_stack_push(&operand_stack, value1 | value2); // Bitwise OR of two integers
+                pc++;
+                break;
+            }
+
+            // Comparison !TODO
+            case LCMP : {
+                pc++;
+                break;
+            }
+            case FCMPL : {
+                pc++;
+                break;
+            }
+            case FCMPG : {
+                pc++;
+                break;
+            }
+            case DCMPL : {
+                pc++;
+                break;
+            }
+            case DCMPG : {
+                pc++;
+                break;
+            }
+            case IFEQ : {
+                pc++;
+                break;
+            }
+            case IFNE : {
+                test_op_stack_empty(&operand_stack);
+                int32_t value = operand_stack_pop(&operand_stack);
+                if (value != 0) {
+                    pc+=get_index2(bytecode, pc);
+                    printf("Jumping to pc: %d\n", pc);
+                    
+                } else {
+                    pc++;
+                }
+                break;
+            }
+            case IFLT : {
+                pc++;
+                break;
+            }
+            case IFGE : {
+                pc++;
+                break;
+            }
+            case IFGT : {
+                pc++;
+                break;
+            }
+            case IFLE : {
+                pc++;
+                break;
+            }
+            case IF_ICMPEQ : {
+                pc++;
+                break;
+            }
+            case IF_ICMPNE : {
+                pc++;
+                break;
+            }
+            case IF_ICMPLT : {
+                pc++;
+                break;
+            }
+            case IF_ICMPGE : {
+                pc++;
+                break;
+            }
+            case IF_ICMPGT : {
+                pc++;
+                break;
+            }
+            case IF_ICMPLE : {
+                pc++;
+                break;
+            }
+            case IF_ACMPEQ : {
+                pc++;
+                break;
+            }
+            case IF_ACMPNE : {
                 pc++;
                 break;
             }
