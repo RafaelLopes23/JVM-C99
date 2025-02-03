@@ -4,6 +4,7 @@
 #include <string.h> // Include string.h for strcmp
 #include <stdint.h>
 #include <stdbool.h>
+#include <inttypes.h>
 
 #define CONSTANT_Class              7
 #define CONSTANT_Fieldref           9
@@ -19,6 +20,10 @@
 #define CONSTANT_MethodHandle       15
 #define CONSTANT_MethodType         16
 #define CONSTANT_InvokeDynamic      18
+#define ARRAY_TYPE_INT    10
+#define ARRAY_TYPE_LONG   11
+#define ARRAY_TYPE_FLOAT  6
+#define ARRAY_TYPE_DOUBLE 7
 
 #define STACK_SIZE 1024
 
@@ -33,48 +38,284 @@ const char* get_constant_pool_string(ClassFile *class_file, uint16_t index);
 const char* get_string_constant(JVM *jvm, uint16_t index);
 void invoke_method(JVM *jvm, void *method_handle);
 
-typedef struct {
-    int32_t *values;
-    int size;
-    int capacity;
-} OperandStack;
-
-typedef struct {
-    uint8_t opcode;
-    const char* mnemonic;
-    const char* description;
-    int operand_bytes;
-} instruction_info;
-
-static const instruction_info instructions[] = {
-    {0x00, "nop", "Do nothing", 0},
-    {0x02, "iconst_m1", "Push int constant -1", 0},
-    {0x03, "iconst_0", "Push int constant 0", 0},
-    {0x04, "iconst_1", "Push int constant 1", 0},
-    {0x05, "iconst_2", "Push int constant 2", 0},
-    {0x06, "iconst_3", "Push int constant 3", 0},
-    {0x07, "iconst_4", "Push int constant 4", 0},
-    {0x08, "iconst_5", "Push int constant 5", 0},
-    {0x10, "bipush", "Push byte", 1},
-    {0x11, "sipush", "Push short", 2},
-    {0x15, "iload", "Load int from local variable", 1},
-    {0x1a, "iload_0", "Load int from local variable 0", 0},
-    {0x1b, "iload_1", "Load int from local variable 1", 0},
-    {0x36, "istore", "Store int into local variable", 1},
-    {0x3b, "istore_0", "Store int into local variable 0", 0},
-    {0x3c, "istore_1", "Store int into local variable 1", 0},
-    {0x60, "iadd", "Add int", 0},
-    {0x64, "isub", "Subtract int", 0},
-    {0x68, "imul", "Multiply int", 0},
-    {0x6c, "idiv", "Divide int", 0},
-    {0xb1, "return", "Return void from method", 0},
-    {0xb2, "getstatic", "Get static field from class", 2},
-    {0xb6, "invokevirtual", "Invoke instance method", 2},
-    {0xba, "invokedynamic", "Invoke dynamic method", 4},
-};
-
+bool operand_stack_push(OperandStack *stack, int32_t value);
+bool operand_stack_pop(OperandStack *stack, int32_t *value);
+void operand_stack_push_cat2(OperandStack *stack, Cat2 val);
+Cat2 operand_stack_pop_cat2(OperandStack *stack);
 bool validate_constant_pool_index(ClassFile *class_file, uint16_t index);
+void operand_stack_init(OperandStack *stack, int capacity);
+void print_stack_state(OperandStack *stack);
 
+typedef struct {
+    int32_t length;
+    void *elements;
+    uint8_t type; // ARRAY_TYPE_INT, etc.
+} Array;
+
+typedef struct {
+    ClassFile *class;
+    void *fields;
+} Object;
+
+typedef struct {
+    uint16_t start_pc;
+    uint16_t end_pc;
+    uint16_t handler_pc;
+    uint16_t catch_type;
+} ExceptionHandler;
+
+static void handle_nop(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    (*pc)++;
+}
+
+static void handle_iconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t opcode = bytecode[*pc];
+    int32_t value = opcode - ICONST_0;
+    operand_stack_push(stack, value);
+    printf("ICONST_%d: Pushed %d\n", value, value);
+    (*pc)++;
+}
+
+// Math operations
+static void handle_iadd(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t val2, val1;
+    operand_stack_pop(stack, &val2);
+    operand_stack_pop(stack, &val1);
+    int32_t result = val1 + val2;
+    operand_stack_push(stack, result);
+    locals[7] = result;
+    printf("IADD: %d + %d = %d\n", val1, val2, result);
+    (*pc)++;
+}
+
+static void handle_isub(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t val2, val1;
+    operand_stack_pop(stack, &val2);
+    operand_stack_pop(stack, &val1);
+    int32_t result = val1 - val2;
+    operand_stack_push(stack, result);
+    locals[8] = result;
+    printf("ISUB: %d - %d = %d\n", val1, val2, result);
+    (*pc)++;
+}
+
+static void handle_imul(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t val2, val1;
+    operand_stack_pop(stack, &val2);
+    operand_stack_pop(stack, &val1);
+    int32_t result = val1 * val2;
+    operand_stack_push(stack, result);
+    locals[9] = result;
+    printf("IMUL: %d * %d = %d\n", val1, val2, result);
+    (*pc)++;
+}
+
+static void handle_idiv(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t val2, val1;
+    operand_stack_pop(stack, &val2);
+    operand_stack_pop(stack, &val1);
+    if (val2 == 0) {
+        fprintf(stderr, "Division by zero\n");
+        return;
+    }
+    int32_t result = val1 / val2;
+    operand_stack_push(stack, result);
+    locals[10] = result;
+    printf("IDIV: %d / %d = %d\n", val1, val2, result);
+    (*pc)++;
+}
+
+static void handle_ior(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t val2, val1;
+    operand_stack_pop(stack, &val2);
+    operand_stack_pop(stack, &val1);
+    int32_t result = val1 | val2;
+    operand_stack_push(stack, result);
+    locals[11] = result;
+    printf("IOR: %d | %d = %d\n", val1, val2, result);
+    (*pc)++;
+}
+
+// Load/Store operations
+static void handle_iload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t index = bytecode[(*pc) + 1];
+    int32_t value = locals[index];
+    operand_stack_push(stack, value);
+    printf("ILOAD %d: Loaded %d\n", index, value);
+    *pc += 2;
+}
+
+static void handle_istore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t index = bytecode[(*pc) + 1];
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    locals[index] = value;
+    printf("ISTORE %d: Stored %d\n", index, value);
+    *pc += 2;
+}
+
+// Stack operations
+static void handle_dup(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    operand_stack_push(stack, value);
+    operand_stack_push(stack, value);
+    printf("DUP: Duplicated %d\n", value);
+    (*pc)++;
+}
+
+static void handle_pop(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    printf("POP: Removed %d\n", value);
+    (*pc)++;
+}
+
+// 64-bit operations (category 2)
+static void handle_dadd(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.double_ = val1.double_ + val2.double_;
+    operand_stack_push_cat2(stack, result);
+    printf("DADD: %f + %f = %f\n", val1.double_, val2.double_, result.double_);
+    (*pc)++;
+}
+
+static void handle_newarray(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t atype = bytecode[(*pc) + 1];
+    int32_t count;
+    operand_stack_pop(stack, &count);
+    
+    if (count < 0) {
+        // Throw NegativeArraySizeException
+        return;
+    }
+    
+    Array *array = malloc(sizeof(Array));
+    array->length = count;
+    array->type = atype;
+    array->elements = calloc(count, sizeof(int32_t));
+
+    intptr_t arrayref = (intptr_t)array;
+    operand_stack_push(stack, arrayref);
+    *pc += 2;
+}
+
+static void handle_iastore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value, index, arrayref;
+    operand_stack_pop(stack, &value);
+    operand_stack_pop(stack, &index);
+    operand_stack_pop(stack, &arrayref);
+    
+    Array *array = (Array *)(intptr_t)arrayref;
+    if (!array || index < 0 || index >= array->length) {
+        // Throw ArrayIndexOutOfBoundsException
+        return;
+    }
+    
+    ((int32_t *)array->elements)[index] = value;
+    (*pc)++;
+}
+
+static void handle_new(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+    cp_info *classref = &jvm->class_file.constant_pool[index - 1];
+    
+    Object *obj = malloc(sizeof(Object));
+    obj->class = &jvm->class_file; // Should load actual class
+    obj->fields = calloc(1, 1024); // Fixed size for now
+    
+    intptr_t objref = (intptr_t)obj;
+    operand_stack_push(stack, (int32_t)obj);
+    *pc += 3;
+}
+
+static void handle_exception(JVM *jvm, Object *exception, uint32_t *pc, OperandStack *stack) {
+    // Find exception handler in current method
+    attribute_info *code_attr = NULL; // Get current method's Code attribute
+    
+    if (!code_attr) return;
+    
+    // Exception table is after bytecode
+    uint8_t *exception_table = code_attr->info + 8 + code_attr->attribute_length;
+    uint16_t exception_table_length = (exception_table[0] << 8) | exception_table[1];
+    
+    ExceptionHandler *handlers = (ExceptionHandler *)(exception_table + 2);
+    
+    for (int i = 0; i < exception_table_length; i++) {
+        if (*pc >= handlers[i].start_pc && *pc < handlers[i].end_pc) {
+            if (handlers[i].catch_type == 0 || handlers[i].catch_type == exception->class->this_class) {
+                // Found handler
+                *pc = handlers[i].handler_pc;
+                intptr_t exref = (intptr_t)exception;
+                operand_stack_push(stack, exref);
+                return;
+            }
+        }
+    }
+    
+    // No handler found, propagate to caller
+}
+
+static void handle_invokevirtual(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint16_t index = (bytecode[*pc + 1] << 8) | bytecode[*pc + 2];
+    
+    if (!validate_constant_pool_index(&jvm->class_file, index)) {
+        return;
+    }
+
+    cp_info *methodref = &jvm->class_file.constant_pool[index - 1];
+    if (methodref->tag == CONSTANT_Methodref) {
+        (void)methodref->info.Methodref.class_index; // Silence warning
+        uint16_t class_index = methodref->info.Methodref.class_index;
+        uint16_t name_and_type_index = methodref->info.Methodref.name_and_type_index;
+        
+        cp_info *name_and_type = &jvm->class_file.constant_pool[name_and_type_index - 1];
+        uint16_t name_index = name_and_type->info.NameAndType.name_index;
+        
+        const char *method_name = get_constant_pool_string(&jvm->class_file, name_index);
+        
+        if (method_name && strcmp(method_name, "println") == 0) {
+            int32_t value;
+            if (operand_stack_pop(stack, &value)) {
+                int32_t dummy;
+                operand_stack_pop(stack, &dummy);
+                printf("%d\n", value);
+            }
+        }
+    }
+    
+    *pc += 3;
+}
+
+// ... more handler functions for each instruction
+
+static instruction_handler instruction_table[256] = {0};  // Initialize all to NULL
+
+static void init_instruction_table(void) {
+    instruction_table[NOP] = handle_nop;
+    instruction_table[ICONST_M1] = handle_iconst;
+    instruction_table[ICONST_0] = handle_iconst;
+    instruction_table[ICONST_1] = handle_iconst;
+    instruction_table[ICONST_2] = handle_iconst;
+    instruction_table[ICONST_3] = handle_iconst;
+    instruction_table[ICONST_4] = handle_iconst;
+    instruction_table[ICONST_5] = handle_iconst;
+    instruction_table[IADD] = handle_iadd;
+    instruction_table[ISUB] = handle_isub;
+    instruction_table[IMUL] = handle_imul;
+    instruction_table[IDIV] = handle_idiv;
+    instruction_table[IOR] = handle_ior;
+    instruction_table[ILOAD] = handle_iload;
+    instruction_table[ISTORE] = handle_istore;
+    instruction_table[DUP] = handle_dup;
+    instruction_table[POP] = handle_pop;
+    instruction_table[DADD] = handle_dadd;
+    instruction_table[NEW] = handle_new;
+    instruction_table[NEWARRAY] = handle_newarray;
+    instruction_table[IASTORE] = handle_iastore;
+}
 
 void check_stack_bounds(OperandStack *stack, int required_space) {
     if (stack->size + required_space > stack->capacity) {
@@ -111,7 +352,6 @@ bool test_op_stack_empty(OperandStack *stack);
 bool test_op_stack_overflow(OperandStack *stack);
 bool test_op_stack_underflow(OperandStack *stack);
 
-bool operand_stack_pop(OperandStack *stack, int32_t *value);
 Cat2 pop_cat2_from_op_stack(); 
 Cat2 push_cat2_to_op_stack( uint32_t  HighBytes,  uint32_t  LowBytes); 
 
@@ -312,366 +552,36 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
     OperandStack operand_stack;
     operand_stack_init(&operand_stack, STACK_SIZE);
     
+    // Initialize instruction table if not already done
+    static bool table_initialized = false;
+    if (!table_initialized) {
+        init_instruction_table();
+        table_initialized = true;
+    }
+
     uint32_t pc = 0;
     while (pc < bytecode_length) {
-        // Validate PC
-        if (pc >= bytecode_length) {
-            fprintf(stderr, "PC out of bounds: %u >= %u\n", pc, bytecode_length);
-            break;
-        }
-
         uint8_t opcode = bytecode[pc];
         printf("PC: %04x Opcode: 0x%02x\n", pc, opcode);
 
-        // Handle RETURN explicitly
-        if (opcode == 0xb1) {
-            printf("RETURN instruction encountered\n");
+        instruction_handler handler = instruction_table[opcode];
+        if (handler) {
+            handler(jvm, bytecode, &pc, &operand_stack, local_vars);
+            print_stack_state(&operand_stack);
+        } else {
+            fprintf(stderr, "Unknown opcode: 0x%02x\n", opcode);
+            pc++;
+        }
+
+        if (opcode == 0xb1) { // RETURN
             break;
         }
-
-        switch (opcode) {
-            // Constants
-            case NOP:
-                pc++;
-                break;
-            case ACONST_NULL:
-                operand_stack_push(&operand_stack, 0);
-                break;
-            case ICONST_M1:
-                operand_stack_push(&operand_stack, -1);
-                break;
-
-            case ICONST_0: case ICONST_1: case ICONST_2: 
-            case ICONST_3: case ICONST_4: case ICONST_5: {
-                int32_t value = opcode - ICONST_0;
-                if (!operand_stack_push(&operand_stack, value)) {
-                    fprintf(stderr, "Stack overflow in ICONST\n");
-                    return;
-                }
-                printf("ICONST_%d: Pushed %d\n", value, value);
-                pc++;
-                break;
-            }
-
-            // Push values
-            case BIPUSH: {
-                int8_t value = (int8_t)bytecode[pc + 1];
-                operand_stack_push(&operand_stack, value);
-                pc += 2;
-                printf("BIPUSH: pushed value %d\n", value);
-                break;
-            }
-
-            case SIPUSH: {
-                int16_t value = (int16_t)((bytecode[pc + 1] << 8) | bytecode[pc + 2]);
-                operand_stack_push(&operand_stack, value);
-                pc += 3;
-                printf("SIPUSH: pushed value %d\n", value);
-                break;
-            }
-
-            // Loads
-            case ILOAD: {
-                uint8_t index = bytecode[pc + 1];
-                int32_t value = local_vars[index];
-                operand_stack_push(&operand_stack, value);
-                printf("ILOAD: Loaded %d from var[%d]\n", value, index);
-                pc += 2;
-                break;
-            }
-            case ILOAD_0: case ILOAD_1: case ILOAD_2: case ILOAD_3: {
-                uint8_t index = opcode - ILOAD_0;
-                int32_t value = local_vars[index];
-                operand_stack_push(&operand_stack, value);
-                printf("ILOAD_%d: Loaded %d from var[%d]\n", index, value, index);
-                pc++;
-                break;
-            }
-
-            // Stores
-            case ISTORE: {
-                int32_t value;
-                if (!operand_stack_pop(&operand_stack, &value)) {
-                    fprintf(stderr, "Stack underflow in ISTORE\n");
-                    return;
-                }
-                uint8_t index = bytecode[pc + 1];
-                local_vars[index] = value;
-                printf("ISTORE: var[%d] = %d\n", index, value);
-                pc += 2;
-                break;
-            }
-            case ISTORE_0: case ISTORE_1: case ISTORE_2: case ISTORE_3: {
-                int32_t value;
-                if (!operand_stack_pop(&operand_stack, &value)) {
-                    fprintf(stderr, "Stack underflow in ISTORE\n");
-                    return;
-                }
-                uint8_t index = opcode - ISTORE_0;
-                local_vars[index] = value;
-                printf("ISTORE_%d: var[%d] = %d\n", index, index, value);
-                pc++;
-                break;
-            }
-
-            // Stack
-            case POP: {
-                CHECK_STACK(&operand_stack, 1);
-                int32_t value;
-                operand_stack_pop(&operand_stack, &value);
-                pc++;
-                break;
-            }
-
-            case DUP: {
-                CHECK_STACK(&operand_stack, 1);
-                int32_t value;
-                operand_stack_pop(&operand_stack, &value);
-                operand_stack_push(&operand_stack, value);
-                operand_stack_push(&operand_stack, value);
-                pc++;
-                break;
-            }
-
-            // Math operations
-            case IADD: {
-                int32_t val2, val1;
-                operand_stack_pop(&operand_stack, &val2);
-                operand_stack_pop(&operand_stack, &val1);
-                int32_t result = val1 + val2;
-                operand_stack_push(&operand_stack, result);
-                local_vars[7] = result; // Store sum
-                printf("IADD: %d + %d = %d\n", val1, val2, result);
-                pc++;
-                break;
-            }
-
-            case ISUB: {
-                int32_t val2, val1;
-                operand_stack_pop(&operand_stack, &val2);
-                operand_stack_pop(&operand_stack, &val1);
-                int32_t result = val1 - val2;
-                operand_stack_push(&operand_stack, result);
-                local_vars[8] = result; // Store difference
-                printf("ISUB: %d - %d = %d\n", val1, val2, result);
-                pc++;
-                break;
-            }
-
-            case IMUL: {
-                int32_t val2, val1;
-                operand_stack_pop(&operand_stack, &val2);
-                operand_stack_pop(&operand_stack, &val1);
-                int32_t result = val1 * val2;
-                operand_stack_push(&operand_stack, result);
-                local_vars[9] = result; // Store product
-                printf("IMUL: %d * %d = %d\n", val1, val2, result);
-                pc++;
-                break;
-            }
-
-            case IDIV: {
-                int32_t val2, val1;
-                operand_stack_pop(&operand_stack, &val2);
-                operand_stack_pop(&operand_stack, &val1);
-                if (val2 == 0) {
-                    fprintf(stderr, "Division by zero\n");
-                    return;
-                }
-                int32_t result = val1 / val2;
-                operand_stack_push(&operand_stack, result);
-                local_vars[10] = result; // Store quotient
-                printf("IDIV: %d / %d = %d\n", val1, val2, result);
-                pc++;
-                break;
-            }
-
-            case IOR: {
-                int32_t val2, val1;
-                operand_stack_pop(&operand_stack, &val2);
-                operand_stack_pop(&operand_stack, &val1);
-                int32_t result = val1 | val2;
-                operand_stack_push(&operand_stack, result);
-                local_vars[11] = result; // Store OR result
-                printf("IOR: %d | %d = %d\n", val1, val2, result);
-                pc++;
-                break;
-            }
-
-            case GETSTATIC: {
-                uint16_t index = (bytecode[pc + 1] << 8) | bytecode[pc + 2];
-                if (!validate_constant_pool_index(&jvm->class_file, index)) {
-                    return;
-                }
-                
-                // For System.out, we'll just verify it's the PrintStream field
-                cp_info *fieldref = &jvm->class_file.constant_pool[index - 1];
-                if (fieldref->tag == CONSTANT_Fieldref) {
-                    // Push a dummy reference for PrintStream
-                    operand_stack_push(&operand_stack, 1); // Dummy reference
-                }
-                
-                pc += 3;
-                break;
-            }
-
-            case INVOKEVIRTUAL: {
-                uint16_t index = (bytecode[pc + 1] << 8) | bytecode[pc + 2];
-                if (!validate_constant_pool_index(&jvm->class_file, index)) {
-                    return;
-                }
-
-                cp_info *methodref = &jvm->class_file.constant_pool[index - 1];
-                if (methodref->tag == CONSTANT_Methodref) {
-                    // Get the name and type info
-                    uint16_t class_index = methodref->info.Methodref.class_index;
-                    uint16_t name_and_type_index = methodref->info.Methodref.name_and_type_index;
-                    
-                    cp_info *name_and_type = &jvm->class_file.constant_pool[name_and_type_index - 1];
-                    uint16_t name_index = name_and_type->info.NameAndType.name_index;
-                    
-                    const char *method_name = get_constant_pool_string(&jvm->class_file, name_index);
-                    
-                    if (method_name && strcmp(method_name, "println") == 0) {
-                        // For println, pop value and string prefix
-                        int32_t value;
-                        if (operand_stack_pop(&operand_stack, &value)) {
-                            // Pop the dummy PrintStream reference
-                            int32_t dummy;
-                            operand_stack_pop(&operand_stack, &dummy);
-                            
-                            // Print the actual value
-                            printf("%d\n", value);
-                        }
-                    }
-
-                pc += 3;
-                break;
-            }
-
-                pc += 3;
-                break;
-            }
-
-            case LDC: {
-                uint8_t index = bytecode[pc++];
-                if (!validate_constant_pool_index(&jvm->class_file, index)) {
-                    return;
-                }
-                break;
-            }
-
-            case LDC_W: {
-                uint16_t index = (bytecode[pc] << 8) | bytecode[pc + 1];
-                if (!validate_constant_pool_index(&jvm->class_file, index)) {
-                    return;
-                }
-                pc += 2;
-                break;
-            }
-
-            // Method invocation
-            case INVOKEDYNAMIC: {
-                printf("INVOKEDYNAMIC bytecode executed\n");
-                uint16_t index = (bytecode[pc + 1] << 8) | bytecode[pc + 2];
-                
-                if (!validate_constant_pool_index(&jvm->class_file, index)) {
-                    return;
-                }
-                
-                // For string concatenation, pop the value and push it back
-                int32_t value;
-                if (operand_stack_pop(&operand_stack, &value)) {
-                    operand_stack_push(&operand_stack, value);
-                }
-                
-                pc += 5;
-                break;
-            }
-
-            // Return
-            case 0xb1: // return
-                printf("RETURN instruction - ending execution\n");
-                return;
-
-            case 0xac: // ireturn
-                printf("IRETURN instruction - ending execution\n");
-                return;
-            
-
-            default:
-                printf("Unknown opcode: 0x%02x\n", opcode);
-                pc++;
-        }
-
-        print_stack_state(&operand_stack);
     }
 
     // Print final state
     printf("\nFinal state:\n");
-    printf("a = %d\n", local_vars[1]);
-    printf("b = %d\n", local_vars[2]);
-    printf("c = %d\n", local_vars[3]);
-    printf("d = %d\n", local_vars[4]);
-    printf("e = %d\n", local_vars[5]);
-    printf("sum = %d\n", local_vars[7]);
-    printf("diff = %d\n", local_vars[8]);
-    printf("prod = %d\n", local_vars[9]);
-    printf("quot = %d\n", local_vars[10]);
-    printf("or = %d\n", local_vars[11]);
-
+    print_local_vars(local_vars);
     free(operand_stack.values);
-}
-
-
-
-void display_bytecode(uint8_t *bytecode, uint32_t bytecode_length) {
-    printf("--------------------\n");
-    printf("Offset   Mnemonic        Operands    Description\n");
-    printf("------------------------------------------------\n");
-
-    uint32_t pc = 0;
-    while (pc < bytecode_length) {
-        uint8_t opcode = bytecode[pc];
-        
-        // Print offset
-        printf("%04x:   ", pc);
-
-        // Find instruction info
-        const instruction_info* info = NULL;
-        for (size_t i = 0; i < sizeof(instructions)/sizeof(instruction_info); i++) {
-            if (instructions[i].opcode == opcode) {
-                info = &instructions[i];
-                break;
-            }
-        }
-
-        if (info) {
-            // Print mnemonic with padding
-            printf("%-14s", info->mnemonic);
-
-            // Print operands if any
-            if (info->operand_bytes > 0) {
-                printf(" ");
-                for (int i = 0; i < info->operand_bytes; i++) {
-                    printf("%02x", bytecode[pc + 1 + i]);
-                }
-                printf("%*s", 10 - (info->operand_bytes * 2), "");  // Padding
-            } else {
-                printf("%12s", "");  // Padding for no operands
-            }
-
-            // Print description
-            printf("%s\n", info->description);
-            
-            // Advance PC
-            pc += 1 + info->operand_bytes;
-        } else {
-            printf("unknown 0x%02x\n", opcode);
-            pc++;
-        }
-    }
-    printf("--------------------\n\n");
 }
 
 void invoke_method(JVM *jvm, void *method_handle) {
@@ -786,10 +696,4 @@ void jvm_execute(JVM *jvm) {
 
     // Execute the bytecode
     execute_bytecode(jvm, bytecode, code_length);
-
-    // Print bytecode disassembly
-    printf("\nBytecode disassembly:\n");
-    printf("--------------------\n");
-    display_bytecode(bytecode, code_length);
-    printf("--------------------\n\n");
 }

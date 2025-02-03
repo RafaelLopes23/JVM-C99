@@ -3,6 +3,12 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <stdbool.h>
+
+#define ARRAY_TYPE_INT    10
+#define ARRAY_TYPE_LONG   11
+#define ARRAY_TYPE_FLOAT  6
+#define ARRAY_TYPE_DOUBLE 7
 
 typedef struct {
     uint8_t tag;
@@ -206,22 +212,17 @@ typedef enum {
 
     DADD = 0x63,
     
+    NEW = 0xBB,
+    NEWARRAY = 0xBC,
+    IASTORE = 0x4F,
+
     // Method invocation
     INVOKEDYNAMIC = 0xBA,
 
     // Return
     IRETURN = 0xB1,
+
 } Bytecode;
-
-void jvm_init(JVM *jvm);
-void jvm_load_class(JVM *jvm, const char *class_file);
-void jvm_execute(JVM *jvm);
-void display_bytecode(uint8_t *bytecode, uint32_t length);
-
-void stack_push(JVMStack *stack, int32_t value);
-int32_t stack_pop(JVMStack *stack);
-
-void invoke_method(JVM *jvm, void *method_handle);
 
 // unions for bytecode operands
 typedef union {
@@ -234,5 +235,29 @@ typedef union {
     int64_t  long_;
     double    double_;
 } Cat2;
+
+typedef struct {
+    int32_t *values;
+    int size;
+    int capacity;
+} OperandStack;
+
+void jvm_init(JVM *jvm);
+void jvm_load_class(JVM *jvm, const char *class_file);
+void jvm_execute(JVM *jvm);
+bool operand_stack_push(OperandStack *stack, int32_t value);
+bool operand_stack_pop(OperandStack *stack, int32_t *value);
+void operand_stack_push_cat2(OperandStack *stack, Cat2 val);
+Cat2 operand_stack_pop_cat2(OperandStack *stack);
+void operand_stack_init(OperandStack *stack, int capacity);
+bool validate_constant_pool_index(ClassFile *class_file, uint16_t index);
+void print_stack_state(OperandStack *stack);
+
+typedef void (*instruction_handler)(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals);
+
+void stack_push(JVMStack *stack, int32_t value);
+int32_t stack_pop(JVMStack *stack);
+
+void invoke_method(JVM *jvm, void *method_handle);
 
 #endif // JVM_H
