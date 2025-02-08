@@ -166,7 +166,6 @@ typedef enum {
     
     // Loads
     ILOAD = 0X15,
-    // TODO: test
     ILOAD_0 = 0x1A,
     ILOAD_1 = 0x1B,
     ILOAD_2 = 0x1C,
@@ -176,6 +175,12 @@ typedef enum {
     FLOAD = 0x17,
     // todo: test
     DLOAD = 0x18,
+
+    FLOAD_0 = 0X22,
+    FLOAD_1 = 0X23,
+    FLOAD_2 = 0X24,
+    FLOAD_3 = 0X25,
+
     DLOAD_0 = 0x26,
     DLOAD_1 = 0x27,
     DLOAD_2 = 0x28,
@@ -264,26 +269,20 @@ typedef enum {
     // todo 
     LDC2_W = 0x14,
     // GETSTATIC = 0xB2,
-    FLOAD_0 = 0x27,
-    FLOAD_2 = 0x29,
+    
     // INVOKEVIRTUAL = 0xB6,
     DSUB = 0x67,
     DMUL = 0x6B,
     DDIV = 0x6F,
     DNEG = 0x77,
 
-    // MISSING TODO IMPLEMENT FOR DOUBLE_ARITMETICA
-//     LDC2_W = 0x14
-// GETSTATIC = 0xB2
-// FLOAD_0 = 0x27
-// FLOAD_2 = 0x29
-// INVOKEVIRTUAL = 0xB6
-// DSUB = 0x67
-// DMUL = 0x6B
-// DDIV = 0x6F
-// DNEG = 0x77
-// NEW = 0xB1
+    
 
+    // MISSING TODO IMPLEMENT FOR DOUBLE_ARITMETICA
+//!     LDC2_W = 0x14
+// GETSTATIC = 0xB2
+// INVOKEVIRTUAL = 0xB6
+// NEW = 0xB1
 
     INVOKESPECIAL = 0xB7,
     CHECKCAST = 0xC0,
