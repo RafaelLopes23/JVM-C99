@@ -157,8 +157,6 @@ typedef enum {
     FCONST_2 = 0x0D,
     DCONST_0 = 0x0E,
     DCONST_1 = 0x0F,
-
-    
     
     // Push values
     BIPUSH = 0x10,
@@ -166,6 +164,7 @@ typedef enum {
     
     // Loads
     ILOAD = 0X15,
+    // TODO: test
     ILOAD_0 = 0x1A,
     ILOAD_1 = 0x1B,
     ILOAD_2 = 0x1C,
@@ -175,30 +174,10 @@ typedef enum {
     FLOAD = 0x17,
     // todo: test
     DLOAD = 0x18,
-
-    FLOAD_0 = 0X22,
-    FLOAD_1 = 0X23,
-    FLOAD_2 = 0X24,
-    FLOAD_3 = 0X25,
-
     DLOAD_0 = 0x26,
     DLOAD_1 = 0x27,
     DLOAD_2 = 0x28,
     DLOAD_3 = 0x29,
-
-
-// longs
-    LALOAD = 0x2e,
-    LAND = 0x7e,
-    LASTORE = 0x4f,
-    LCMP = 0x94,
-    LLOAD_0 = 0x1a,
-    LLOAD_1 = 0x1b,
-    LLOAD_2 = 0x1c,
-    LLOAD_3 = 0x1d,
-    LNEG = 0x74,
-    
-
 
 
     // Stores
@@ -218,16 +197,6 @@ typedef enum {
     DSTORE_1 = 0x48,
     DSTORE_2 = 0x49,
     DSTORE_3 = 0x4a, 
-
-
-// long
-    LADD = 0x61, 
-    LSUB = 0x65,  
-    LMUL = 0x69,  
-    LDIV = 0x6d,  
-    LREM = 0x71,  
-    DREM = 0x73,  
-    
 
     
     // Stack
@@ -250,63 +219,10 @@ typedef enum {
     // Method invocation
     INVOKEDYNAMIC = 0xBA,
 
-
-
-    
-    INSTANCEOF = 0xBF,
-    
-
-
-    IF_ICMPEQ = 0x9F,
-
-    // branch todo 
-    IFEQ = 0x99,
-    IFNE = 0x9A,  
-    IFLT = 0x9B,  
-    IFGE = 0x9C,
-    IFGT = 0x9D,
-    IFLE = 0x9E,
-
-    // todo 
-    LDC2_W = 0x14,
-    // GETSTATIC = 0xB2,
-    
-    // INVOKEVIRTUAL = 0xB6,
-    DSUB = 0x67,
-    DMUL = 0x6B,
-    DDIV = 0x6F,
-    DNEG = 0x77,
-
-    // todo cat2 files?
-    DCMPL = 0X97,
-    DCMPG = 0X98,
-    D2F = 0X90,
-    D2I = 0X8E,
-    D2L = 0X8F,
-
-// IFLE = 0X9E
-// (INVALID OPCODE) = 0XBD
-
-
-    // MISSING TODO IMPLEMENT FOR DOUBLE_ARITMETICA
-//!     LDC2_W = 0x14
-// GETSTATIC = 0xB2
-// INVOKEVIRTUAL = 0xB6
-// NEW = 0xB1
-
-    INVOKESPECIAL = 0xB7,
-    CHECKCAST = 0xC0,
-
     // Return
     IRETURN = 0xB1,
 
 } Bytecode;
-
-typedef struct {
-    int32_t *values;
-    int size;
-    int capacity;
-} OperandStack;
 
 // unions for bytecode operands
 typedef union {
@@ -319,6 +235,12 @@ typedef union {
     int64_t  long_;
     double    double_;
 } Cat2;
+
+typedef struct {
+    int32_t *values;
+    int size;
+    int capacity;
+} OperandStack;
 
 void jvm_init(JVM *jvm);
 void jvm_load_class(JVM *jvm, const char *class_file);
@@ -337,7 +259,5 @@ void stack_push(JVMStack *stack, int32_t value);
 int32_t stack_pop(JVMStack *stack);
 
 void invoke_method(JVM *jvm, void *method_handle);
-
-
 
 #endif // JVM_H
