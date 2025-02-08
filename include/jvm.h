@@ -254,6 +254,7 @@ typedef enum {
 
     
     INSTANCEOF = 0xBF,
+    
 
 
     IF_ICMPEQ = 0x9F,
@@ -276,7 +277,16 @@ typedef enum {
     DDIV = 0x6F,
     DNEG = 0x77,
 
-    
+    // todo cat2 files?
+    DCMPL = 0X97,
+    DCMPG = 0X98,
+    D2F = 0X90,
+    D2I = 0X8E,
+    D2L = 0X8F,
+
+// IFLE = 0X9E
+// (INVALID OPCODE) = 0XBD
+
 
     // MISSING TODO IMPLEMENT FOR DOUBLE_ARITMETICA
 //!     LDC2_W = 0x14

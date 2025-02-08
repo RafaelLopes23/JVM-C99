@@ -578,6 +578,72 @@ static void handle_dneg(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     (*pc)++;
 }
 
+static void handle_dcmpl(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    int32_t result;
+
+    if (isnan(val1.double_) || isnan(val2.double_)) {
+        result = -1;
+    } else if (val1.double_ > val2.double_) {
+        result = 1;
+    } else if (val1.double_ == val2.double_) {
+        result = 0;
+    } else {
+        result = -1;
+    }
+
+    operand_stack_push(stack, result);
+    (*pc)++;
+}
+
+static void handle_dcmpg(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    int32_t result;
+
+    if (isnan(val1.double_) || isnan(val2.double_)) {
+        result = 1;
+    } else if (val1.double_ > val2.double_) {
+        result = 1;
+    } else if (val1.double_ == val2.double_) {
+        result = 0;
+    } else {
+        result = -1;
+    }
+
+    operand_stack_push(stack, result);
+    (*pc)++;
+}
+
+
+static void handle_d2f(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 double_val = operand_stack_pop_cat2(stack);
+    float float_val = (float)double_val.double_;
+
+    operand_stack_push(stack, *((int32_t*)&float_val)); // Push the float bits
+
+    (*pc)++;
+}
+
+static void handle_d2i(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 double_val = operand_stack_pop_cat2(stack);
+    int32_t int_val = (int32_t)double_val.double_;
+
+    operand_stack_push(stack, int_val);
+    (*pc)++;
+}
+
+static void handle_d2l(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 double_val = operand_stack_pop_cat2(stack);
+    int64_t long_val = (int64_t)double_val.double_;
+
+    Cat2 result;
+    result.long_ = long_val;
+    operand_stack_push_cat2(stack, result);
+
+    (*pc)++;
+}
 
 static void handle_lcmp(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     Cat2 val2 = operand_stack_pop_cat2(stack);
@@ -818,6 +884,12 @@ static void init_instruction_table(void) {
     instruction_table[DSTORE_3] = handle_dstore_3;
 
 
+    instruction_table[DCMPL] = handle_dcmpl;
+    instruction_table[DCMPG] = handle_dcmpg;
+
+    instruction_table[D2F] = handle_d2f;
+    instruction_table[D2I] = handle_d2i;
+    instruction_table[D2L] = handle_d2l;
     
 
 
