@@ -162,34 +162,11 @@ static void handle_fload_2(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSta
 
 // Load/Store operations
 static void handle_dload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t opcode = bytecode[*pc];
     uint8_t index = bytecode[(*pc) + 1];
     Cat2 value;
     value.low = locals[index];
     value.high = locals[index + 1];
-    operand_stack_push_cat2(stack, value);
-    *pc += 2;
-}
-
-static void handle_dload_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    Cat2 value;
-    value.low = locals[1];
-    value.high = locals[1 + 1];
-    operand_stack_push_cat2(stack, value);
-    *pc += 2;
-}
-
-static void handle_dload_2(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    Cat2 value;
-    value.low = locals[2];
-    value.high = locals[2 + 1];
-    operand_stack_push_cat2(stack, value);
-    *pc += 2;
-}
-
-static void handle_dload_3(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    Cat2 value;
-    value.low = locals[3];
-    value.high = locals[3 + 1];
     operand_stack_push_cat2(stack, value);
     *pc += 2;
 }
@@ -389,12 +366,6 @@ static void handle_ifne(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
         *pc += 3;
     }
 }
-
-static void handle_iconst_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    operand_stack_push(stack, 1);
-    (*pc)++;
-}
-
 
 
 static void handle_return(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -611,40 +582,16 @@ static void handle_lcmp(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
 }
 
 static void handle_lload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    uint8_t index = bytecode[(*pc) + 1];
-// todo check load order 
+    uint8_t opcode = bytecode[*pc];
+    uint8_t index;
+    if(opcode == LLOAD)
+        index = bytecode[(*pc) + 1];
+    else
+        index = opcode - LLOAD_0;
     operand_stack_push(stack, locals[index]);       
     operand_stack_push(stack, locals[index + 1]);  
-
     *pc += 2;
 }
-
-
-static void handle_lload_0(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    Cat2 value;
-    value.long_ = *((int64_t*)&locals[0]);
-    operand_stack_push_cat2(stack, value);
-    (*pc)++;
-}
-static void handle_lload_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    Cat2 value;
-    value.long_ = *((int64_t*)&locals[1]);
-    operand_stack_push_cat2(stack, value);
-    (*pc)++;
-}
-static void handle_lload_2(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    Cat2 value;
-    value.long_ = *((int64_t*)&locals[2]);
-    operand_stack_push_cat2(stack, value);
-    (*pc)++;
-}
-static void handle_lload_3(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    Cat2 value;
-    value.long_ = *((int64_t*)&locals[3]);
-    operand_stack_push_cat2(stack, value);
-    (*pc)++;
-}
-
 
 
 static void handle_lneg(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -772,7 +719,6 @@ static void init_instruction_table(void) {
     instruction_table[LNEG] = handle_lneg;
     instruction_table[DSTORE] = handle_dstore;
     instruction_table[RETURN] = handle_return;
-    instruction_table[ICONST_1] = handle_iconst_1; 
     instruction_table[IFNE] = handle_ifne;
     instruction_table[IF_ICMPEQ] = handle_if_icmpeq;
 
@@ -801,9 +747,9 @@ static void init_instruction_table(void) {
     
     instruction_table[DADD] = handle_dadd;
     instruction_table[DLOAD] = handle_dload;
-    instruction_table[DLOAD_1] = handle_dload_1;
-    instruction_table[DLOAD_2] = handle_dload_2;
-    instruction_table[DLOAD_3] = handle_dload_3;
+    instruction_table[DLOAD_1] = handle_dload;
+    instruction_table[DLOAD_2] = handle_dload;
+    instruction_table[DLOAD_3] = handle_dload;
     instruction_table[DREM] = handle_drem;
     instruction_table[DSUB] = handle_dsub;
     instruction_table[DMUL] = handle_dmul;
@@ -824,13 +770,12 @@ static void init_instruction_table(void) {
     instruction_table[LCONST_0] = handle_lconst;
     instruction_table[LCONST_1] = handle_lconst;
 
-    instruction_table[LLOAD];
-    instruction_table[LLOAD_0] = handle_lload_0;
-    instruction_table[LLOAD_1] = handle_lload_1;
-    instruction_table[LLOAD_2] = handle_lload_2;
-    instruction_table[LLOAD_3] = handle_lload_3;
-
     instruction_table[LLOAD] = handle_lload;
+    instruction_table[LLOAD_0] = handle_lload;
+    instruction_table[LLOAD_1] = handle_lload;
+    instruction_table[LLOAD_2] = handle_lload;
+    instruction_table[LLOAD_3] = handle_lload;
+
     instruction_table[LCMP] = handle_lcmp;
     instruction_table[LASTORE] = handle_lastore;
     instruction_table[LAND] = handle_land;
