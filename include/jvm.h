@@ -205,6 +205,27 @@ typedef enum {
     IOR = 0x80,
 
     DADD = 0x63,
+
+    // Comparison !TODO
+    LCMP = 0X94,
+    FCMPL = 0X95,
+    FCMPG = 0X96,
+    DCMPL = 0X97,
+    DCMPG = 0X98,
+    IFEQ = 0X99,
+    IFNE = 0X9A,
+    IFLT = 0X9B,
+    IFGE = 0X9C,
+    IFGT = 0X9D,
+    IFLE = 0X9E,
+    IF_ICMPEQ = 0X9F,
+    IF_ICMPNE = 0XA0,
+    IF_ICMPLT = 0XA1,
+    IF_ICMPGE = 0XA2,
+    IF_ICMPGT = 0XA3,
+    IF_ICMPLE = 0XA4,
+    IF_ACMPEQ = 0XA5,
+    IF_ACMPNE = 0XA6,
     
     // Method invocation
     INVOKEDYNAMIC = 0xBA,
