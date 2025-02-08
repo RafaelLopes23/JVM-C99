@@ -157,6 +157,8 @@ typedef enum {
     FCONST_2 = 0x0D,
     DCONST_0 = 0x0E,
     DCONST_1 = 0x0F,
+
+    
     
     // Push values
     BIPUSH = 0x10,
@@ -212,6 +214,7 @@ typedef enum {
     DSTORE_2 = 0x49,
     DSTORE_3 = 0x4a, 
 
+
 // long
     LADD = 0x61, 
     LSUB = 0x65,  
@@ -241,6 +244,49 @@ typedef enum {
 
     // Method invocation
     INVOKEDYNAMIC = 0xBA,
+
+
+
+    
+    INSTANCEOF = 0xBF,
+
+
+    IF_ICMPEQ = 0x9F,
+
+    // branch todo 
+    IFEQ = 0x99,
+    IFNE = 0x9A,  
+    IFLT = 0x9B,  
+    IFGE = 0x9C,
+    IFGT = 0x9D,
+    IFLE = 0x9E,
+
+    // todo 
+    LDC2_W = 0x14,
+    // GETSTATIC = 0xB2,
+    FLOAD_0 = 0x27,
+    FLOAD_2 = 0x29,
+    // INVOKEVIRTUAL = 0xB6,
+    DSUB = 0x67,
+    DMUL = 0x6B,
+    DDIV = 0x6F,
+    DNEG = 0x77,
+
+    // MISSING TODO IMPLEMENT FOR DOUBLE_ARITMETICA
+//     LDC2_W = 0x14
+// GETSTATIC = 0xB2
+// FLOAD_0 = 0x27
+// FLOAD_2 = 0x29
+// INVOKEVIRTUAL = 0xB6
+// DSUB = 0x67
+// DMUL = 0x6B
+// DDIV = 0x6F
+// DNEG = 0x77
+// NEW = 0xB1
+
+
+    INVOKESPECIAL = 0xB7,
+    CHECKCAST = 0xC0,
 
     // Return
     IRETURN = 0xB1,

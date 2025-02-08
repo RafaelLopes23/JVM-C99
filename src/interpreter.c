@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <inttypes.h>
-#include <math.h> 
+#include <math.h>
 
 #define CONSTANT_Class              7
 #define CONSTANT_Fieldref           9
@@ -239,18 +239,41 @@ static void handle_lrem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
 static void handle_drem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     Cat2 val2 = operand_stack_pop_cat2(stack);
     Cat2 val1 = operand_stack_pop_cat2(stack);
-    if (val2.double_ == 0.0) {
-        fprintf(stderr, "Resto da divisão por zero\n");
-        return; // Ou lançar uma exceção
+
+    double value1 = val1.double_;
+    double value2 = val2.double_;
+
+
+    if (isnan(value1) || isnan(value2) || isinf(value1) || value2 == 0.0 || isinf(value2)) {
+        fprintf(stderr, "!!Operando invalido (drem)\n");
+        (*pc)++;
+        return;
     }
-    Cat2 result;
-    result.double_ = fmod(val1.double_, val2.double_); 
-    operand_stack_push_cat2(stack, result);
+
+    if (value1 == 0.0 && !isinf(value2) && value2 != 0.0) {
+        operand_stack_push_cat2(stack, val1); // push val1 back
+        (*pc)++;
+        return;
+    }
+
+    if (!isinf(value1) && isinf(value2)) {
+        operand_stack_push_cat2(stack, val1); // push val1 back
+        (*pc)++;
+        return;
+    }
+
+
+    long long int_q = (long long) value1 / value2;
+
+    double result = value1 - (value2 * int_q);
+
+    val1.double_ = result;  // Reuse val1 for result
+    operand_stack_push_cat2(stack, val1);
     (*pc)++;
 }
 
 // Carregamento de Constantes (long e double)
-
+// que isso
 static void handle_lconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     int64_t value = bytecode[*pc] - LCONST_0; // 0 ou 1
     Cat2 cat2;
@@ -265,6 +288,75 @@ static void handle_dconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
     cat2.double_ = value;
     operand_stack_push_cat2(stack, cat2);
     (*pc)++;
+}
+
+// todo testar acima
+
+static void handle_if_icmpeq(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t val2, val1;
+    operand_stack_pop(stack, &val2);
+    operand_stack_pop(stack, &val1);
+    int16_t branch_offset = (int16_t)((bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2]);
+    if (val1 == val2) {
+        *pc += branch_offset;
+    } else {
+        *pc += 3;
+    }
+}
+
+static void handle_ifne(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    int16_t branch_offset = (int16_t)((bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2]);
+    if (value != 0) {
+        *pc += branch_offset;
+    } else {
+        *pc += 3;
+    }
+}
+
+static void handle_iconst_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    operand_stack_push(stack, 1);
+    (*pc)++;
+}
+
+static void handle_invokespecial(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint16_t index = (bytecode[*pc + 1] << 8) | bytecode[*pc + 2];
+    *pc += 3; // Advance pc *before* invoking
+
+    cp_info *methodref = &jvm->class_file.constant_pool[index - 1];
+    if (methodref->tag == CONSTANT_Methodref) {
+        invoke_method(jvm, methodref); // Use the existing invoke_method
+    }
+}
+
+//! df is this todo !
+static void handle_checkcast(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+    int32_t objref;
+    operand_stack_pop(stack, &objref);
+
+    if (objref == 0) { // null is always an instance of any class
+        operand_stack_push(stack, objref);
+        *pc += 3;
+        return;
+    }
+
+    Object *obj = (Object *)(intptr_t)objref;
+    cp_info *class_info = &jvm->class_file.constant_pool[index - 1];
+
+    if (class_info->tag == CONSTANT_Class) {
+        // Basic check, more detailed type checking might be needed.
+        operand_stack_push(stack, objref);
+        *pc += 3;
+    } else {
+        fprintf(stderr, "checkcast: invalid constant pool entry\n");
+    }
+}
+
+
+static void handle_return(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    (*pc)++; // Increment pc before returning
 }
 
 static void handle_laload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -293,19 +385,65 @@ static void handle_land(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     (*pc)++;
 }
 
+
+
+static void handle_dstore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t index = bytecode[(*pc) + 1];
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    locals[index] = value;
+    operand_stack_pop(stack, &value);
+    locals[index] = value;
+    fprintf("DSTORE %d: Stored %d\n", index, value);
+    *pc += 2;
+}
+
+
+// dstore_1, dstore_2, dstore_3 are special cases, but the logic is the same:
+static void handle_dstore_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    locals[1] = value.high;
+    locals[2] = value.low;
+    fprintf("DSTORE %d: Stored %d\n", 1, value);
+    (*pc)++;
+}
+
+static void handle_dstore_2(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    locals[2] = value.high;
+    locals[3] = value.low;
+    fprintf("DSTORE %d: Stored %d\n", 2, value);
+    (*pc)++;
+}
+
+static void handle_dstore_3(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    locals[3] = value.high;
+    locals[4] = value.low;
+    fprintf("DSTORE %d: Stored %d\n", 3, value);
+    (*pc)++;
+}
+
+//! todo fix
 static void handle_lastore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     Cat2 value = operand_stack_pop_cat2(stack);
     int32_t index, arrayref;
     operand_stack_pop(stack, &index);
     operand_stack_pop(stack, &arrayref);
 
+    fprintf(stderr, "todo fix lastore", index, arrayref); //!
+
     Array *array = (Array*)(intptr_t)arrayref;
     if (!array || index < 0 || index >= array->length || array->type != ARRAY_TYPE_LONG) {
         // Handle ArrayIndexOutOfBoundsException or other errors
         return;
     }
+    locals[index] = value.high;
+    locals[index+1] = value.low;
+    (*pc)++;
 
-    ((int64_t*)array->elements)[index] = value.long_; // Correctly store long value
+    ((int32_t*)array->elements)[index] = value.high; // Correctly store long value
+    ((int32_t*)array->elements)[index+1] = value.low; // Correctly store long value
     (*pc)++;
 }
 
@@ -338,11 +476,29 @@ static void handle_lload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack
 
 static void handle_lload_0(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     Cat2 value;
-    value.long_ = *((int64_t*)&locals[0]); // Directly access local 0
+    value.long_ = *((int64_t*)&locals[0]);
     operand_stack_push_cat2(stack, value);
     (*pc)++;
 }
-// TODO  lload_1, lload_2, lload_3 similarly)
+static void handle_lload_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value;
+    value.long_ = *((int64_t*)&locals[1]);
+    operand_stack_push_cat2(stack, value);
+    (*pc)++;
+}
+static void handle_lload_2(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value;
+    value.long_ = *((int64_t*)&locals[2]);
+    operand_stack_push_cat2(stack, value);
+    (*pc)++;
+}
+static void handle_lload_3(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value;
+    value.long_ = *((int64_t*)&locals[3]);
+    operand_stack_push_cat2(stack, value);
+    (*pc)++;
+}
+
 
 
 static void handle_lneg(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -405,6 +561,8 @@ static void handle_new(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
     operand_stack_push(stack, (int32_t)obj);
     *pc += 3;
 }
+
+
 
 static void handle_exception(JVM *jvm, Object *exception, uint32_t *pc, OperandStack *stack) {
     // Find exception handler in current method
@@ -493,7 +651,33 @@ static void init_instruction_table(void) {
     instruction_table[LDIV] = handle_ldiv;
     instruction_table[LREM] = handle_lrem;
     instruction_table[DREM] = handle_drem;
-    instruction_table[LCONST_0];
+
+    
+    instruction_table[DCONST_0] = handle_dconst;
+    instruction_table[DCONST_1] = handle_dconst;
+    instruction_table[LCONST_0] = handle_lconst;
+    instruction_table[LCONST_1] = handle_lconst;
+
+    instruction_table[LLOAD];
+    instruction_table[LLOAD_0] = handle_lload_0;
+    instruction_table[LLOAD_1] = handle_lload_1;
+    instruction_table[LLOAD_2] = handle_lload_2;
+    instruction_table[LLOAD_3] = handle_lload_3;
+
+    instruction_table[LLOAD] = handle_lload;
+    instruction_table[LCMP] = handle_lcmp;
+    instruction_table[LASTORE] = handle_lastore;
+    instruction_table[LAND] = handle_land;
+    instruction_table[LALOAD] = handle_laload;
+
+    instruction_table[NOP] = handle_nop;
+    instruction_table[DSTORE_1] = handle_dstore_1;
+    instruction_table[DSTORE_2] = handle_dstore_2;
+    instruction_table[DSTORE_3] = handle_dstore_3;
+
+
+    
+
 
     instruction_table[NEW] = handle_new;
     instruction_table[NEWARRAY] = handle_newarray;
