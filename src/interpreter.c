@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <inttypes.h>
+#include <math.h> 
 
 #define CONSTANT_Class              7
 #define CONSTANT_Fieldref           9
@@ -182,6 +183,180 @@ static void handle_dadd(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     (*pc)++;
 }
 
+static void handle_ladd(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.long_ = val1.long_ + val2.long_; 
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_lsub(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.long_ = val1.long_ - val2.long_;
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_lmul(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.long_ = val1.long_ * val2.long_;
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_ldiv(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    if (val2.long_ == 0) {
+        fprintf(stderr, "Divisão por zero\n");
+        return; // Ou lançar uma exceção
+    }
+    Cat2 result;
+    result.long_ = val1.long_ / val2.long_;
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_lrem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    if (val2.long_ == 0) {
+        fprintf(stderr, "Resto da divisão por zero\n");
+        return; // Ou lançar uma exceção
+    }
+    Cat2 result;
+    result.long_ = val1.long_ % val2.long_;
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_drem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    if (val2.double_ == 0.0) {
+        fprintf(stderr, "Resto da divisão por zero\n");
+        return; // Ou lançar uma exceção
+    }
+    Cat2 result;
+    result.double_ = fmod(val1.double_, val2.double_); 
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+// Carregamento de Constantes (long e double)
+
+static void handle_lconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int64_t value = bytecode[*pc] - LCONST_0; // 0 ou 1
+    Cat2 cat2;
+    cat2.long_ = value;
+    operand_stack_push_cat2(stack, cat2);
+    (*pc)++;
+}
+
+static void handle_dconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    double value = bytecode[*pc] - DCONST_0; // 0.0 ou 1.0
+    Cat2 cat2;
+    cat2.double_ = value;
+    operand_stack_push_cat2(stack, cat2);
+    (*pc)++;
+}
+
+static void handle_laload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t index, arrayref;
+    operand_stack_pop(stack, &index);
+    operand_stack_pop(stack, &arrayref);
+
+    Array *array = (Array*)(intptr_t)arrayref;
+    if (!array || index < 0 || index >= array->length || array->type != ARRAY_TYPE_LONG) {
+        // Handle ArrayIndexOutOfBoundsException or other errors
+        return;
+    }
+
+    Cat2 result;
+    result.long_ = ((int64_t*)array->elements)[index];  // Correctly access long array
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_land(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.long_ = val1.long_ & val2.long_;
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_lastore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    int32_t index, arrayref;
+    operand_stack_pop(stack, &index);
+    operand_stack_pop(stack, &arrayref);
+
+    Array *array = (Array*)(intptr_t)arrayref;
+    if (!array || index < 0 || index >= array->length || array->type != ARRAY_TYPE_LONG) {
+        // Handle ArrayIndexOutOfBoundsException or other errors
+        return;
+    }
+
+    ((int64_t*)array->elements)[index] = value.long_; // Correctly store long value
+    (*pc)++;
+}
+
+
+static void handle_lcmp(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    int32_t result;
+
+    if (val1.long_ > val2.long_) {
+        result = 1;
+    } else if (val1.long_ == val2.long_) {
+        result = 0;
+    } else {
+        result = -1;
+    }
+    operand_stack_push(stack, result);
+    (*pc)++;
+}
+
+static void handle_lload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t index = bytecode[(*pc) + 1];
+// todo check load order 
+    operand_stack_push(stack, locals[index]);       
+    operand_stack_push(stack, locals[index + 1]);  
+
+    *pc += 2;
+}
+
+
+static void handle_lload_0(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value;
+    value.long_ = *((int64_t*)&locals[0]); // Directly access local 0
+    operand_stack_push_cat2(stack, value);
+    (*pc)++;
+}
+// TODO  lload_1, lload_2, lload_3 similarly)
+
+
+static void handle_lneg(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    value.long_ = -value.long_;
+    operand_stack_push_cat2(stack, value);
+    (*pc)++;
+}
+
+
+
+
+
+
 static void handle_newarray(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     uint8_t atype = bytecode[(*pc) + 1];
     int32_t count;
@@ -312,6 +487,14 @@ static void init_instruction_table(void) {
     instruction_table[DUP] = handle_dup;
     instruction_table[POP] = handle_pop;
     instruction_table[DADD] = handle_dadd;
+    instruction_table[LADD] = handle_ladd;
+    instruction_table[LSUB] = handle_lsub;
+    instruction_table[LMUL] = handle_lmul;
+    instruction_table[LDIV] = handle_ldiv;
+    instruction_table[LREM] = handle_lrem;
+    instruction_table[DREM] = handle_drem;
+    instruction_table[LCONST_0];
+
     instruction_table[NEW] = handle_new;
     instruction_table[NEWARRAY] = handle_newarray;
     instruction_table[IASTORE] = handle_iastore;

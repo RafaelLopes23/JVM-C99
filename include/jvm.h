@@ -180,6 +180,20 @@ typedef enum {
     DLOAD_3 = 0x29,
 
 
+// longs
+    LALOAD = 0x2e,
+    LAND = 0x7e,
+    LASTORE = 0x4f,
+    LCMP = 0x94,
+    LLOAD_0 = 0x1a,
+    LLOAD_1 = 0x1b,
+    LLOAD_2 = 0x1c,
+    LLOAD_3 = 0x1d,
+    LNEG = 0x74,
+    
+
+
+
     // Stores
     ISTORE = 0x36,
     // TODO: test
@@ -197,6 +211,15 @@ typedef enum {
     DSTORE_1 = 0x48,
     DSTORE_2 = 0x49,
     DSTORE_3 = 0x4a, 
+
+// long
+    LADD = 0x61, 
+    LSUB = 0x65,  
+    LMUL = 0x69,  
+    LDIV = 0x6d,  
+    LREM = 0x71,  
+    DREM = 0x73,  
+    
 
     
     // Stack
@@ -224,6 +247,12 @@ typedef enum {
 
 } Bytecode;
 
+typedef struct {
+    int32_t *values;
+    int size;
+    int capacity;
+} OperandStack;
+
 // unions for bytecode operands
 typedef union {
     struct{
@@ -235,12 +264,6 @@ typedef union {
     int64_t  long_;
     double    double_;
 } Cat2;
-
-typedef struct {
-    int32_t *values;
-    int size;
-    int capacity;
-} OperandStack;
 
 void jvm_init(JVM *jvm);
 void jvm_load_class(JVM *jvm, const char *class_file);
@@ -260,16 +283,6 @@ int32_t stack_pop(JVMStack *stack);
 
 void invoke_method(JVM *jvm, void *method_handle);
 
-// unions for bytecode operands
-typedef union {
-    struct{
-        uint32_t low;
-        uint32_t high;
-    };
-	int32_t int_;
-    uint64_t    bytes_;
-    int64_t  long_;
-    double    double_;
-} Cat2;
+
 
 #endif // JVM_H
