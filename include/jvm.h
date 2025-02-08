@@ -197,9 +197,14 @@ typedef enum {
     LLOAD_2 = 0x1c,
     LLOAD_3 = 0x1d,
     LNEG = 0x74,
+    LADD = 0x61, 
+    LSUB = 0x65,  
+    LMUL = 0x69,  
+    LDIV = 0x6d,  
+    LREM = 0x71, 
+
+    DREM = 0x73,  
     
-
-
 
     // Stores
     ISTORE = 0x36,
@@ -212,23 +217,11 @@ typedef enum {
     LSTORE = 0x37,
     FSTORE = 0x38,
 
-// TODO: implement, prepare for 64 bits manipulation
     DSTORE = 0x39,
     DSTORE_0 = 0x47,
     DSTORE_1 = 0x48,
     DSTORE_2 = 0x49,
     DSTORE_3 = 0x4a, 
-
-
-// long
-    LADD = 0x61, 
-    LSUB = 0x65,  
-    LMUL = 0x69,  
-    LDIV = 0x6d,  
-    LREM = 0x71,  
-    DREM = 0x73,  
-    
-
     
     // Stack
     POP = 0x57,
@@ -250,14 +243,8 @@ typedef enum {
     // Method invocation
     INVOKEDYNAMIC = 0xBA,
 
-
-
     
     INSTANCEOF = 0xBF,
-    
-
-
-    IF_ICMPEQ = 0x9F,
 
     // branch todo 
     IFEQ = 0x99,
@@ -266,39 +253,26 @@ typedef enum {
     IFGE = 0x9C,
     IFGT = 0x9D,
     IFLE = 0x9E,
-
-    // todo 
+    IF_ICMPEQ = 0x9F,
+ 
     LDC2_W = 0x14,
-    // GETSTATIC = 0xB2,
-    
-    // INVOKEVIRTUAL = 0xB6,
+
     DSUB = 0x67,
     DMUL = 0x6B,
     DDIV = 0x6F,
     DNEG = 0x77,
 
-    // todo cat2 files?
     DCMPL = 0X97,
     DCMPG = 0X98,
     D2F = 0X90,
     D2I = 0X8E,
     D2L = 0X8F,
 
-// IFLE = 0X9E
-// (INVALID OPCODE) = 0XBD
-
-
-    // MISSING TODO IMPLEMENT FOR DOUBLE_ARITMETICA
-//!     LDC2_W = 0x14
-// GETSTATIC = 0xB2
-// INVOKEVIRTUAL = 0xB6
-// NEW = 0xB1
-
     INVOKESPECIAL = 0xB7,
     CHECKCAST = 0xC0,
 
-    // Return
     IRETURN = 0xB1,
+    RETURN = 0xb1,
 
 } Bytecode;
 

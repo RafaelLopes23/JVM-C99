@@ -167,7 +167,6 @@ static void handle_dload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack
     value.low = locals[index];
     value.high = locals[index + 1];
     operand_stack_push_cat2(stack, value);
-    fprintf("DLOAD %d: Loaded %d\n", index, value.double_); //#comment
     *pc += 2;
 }
 
@@ -176,7 +175,6 @@ static void handle_dload_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSta
     value.low = locals[1];
     value.high = locals[1 + 1];
     operand_stack_push_cat2(stack, value);
-    fprintf("DLOAD %d: Loaded %d\n", 1, value.double_); //#comment
     *pc += 2;
 }
 
@@ -185,7 +183,6 @@ static void handle_dload_2(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSta
     value.low = locals[2];
     value.high = locals[2 + 1];
     operand_stack_push_cat2(stack, value);
-    fprintf("DLOAD %d: Loaded %d\n", 2, value.double_); //#comment
     *pc += 2;
 }
 
@@ -194,7 +191,6 @@ static void handle_dload_3(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSta
     value.low = locals[3];
     value.high = locals[3 + 1];
     operand_stack_push_cat2(stack, value);
-    fprintf("DLOAD %d: Loaded %d\n", 3, value.double_); //#comment
     *pc += 2;
 }
 
@@ -267,7 +263,7 @@ static void handle_ldiv(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     Cat2 val1 = operand_stack_pop_cat2(stack);
     if (val2.long_ == 0) {
         fprintf(stderr, "Divisão por zero\n");
-        return; // Ou lançar uma exceção
+        return; 
     }
     Cat2 result;
     result.long_ = val1.long_ / val2.long_;
@@ -279,8 +275,8 @@ static void handle_lrem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     Cat2 val2 = operand_stack_pop_cat2(stack);
     Cat2 val1 = operand_stack_pop_cat2(stack);
     if (val2.long_ == 0) {
-        fprintf(stderr, "Resto da divisão por zero\n");
-        return; // Ou lançar uma exceção
+        fprintf(stderr, "Divisão por zero\n");
+        return; 
     }
     Cat2 result;
     result.long_ = val1.long_ % val2.long_;
@@ -325,9 +321,8 @@ static void handle_drem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
 }
 
 // Carregamento de Constantes (long e double)
-// que isso
 static void handle_lconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    int64_t value = bytecode[*pc] - LCONST_0; // 0 ou 1
+    int64_t value = bytecode[*pc] - LCONST_0; 
     Cat2 cat2;
     cat2.long_ = value;
     operand_stack_push_cat2(stack, cat2);
@@ -335,14 +330,13 @@ static void handle_lconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
 }
 
 static void handle_dconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    double value = bytecode[*pc] - DCONST_0; // 0.0 ou 1.0
+    double value = bytecode[*pc] - DCONST_0; 
     Cat2 cat2;
     cat2.double_ = value;
     operand_stack_push_cat2(stack, cat2);
     (*pc)++;
 }
 
-// todo testar acima
 
 static void handle_ldc2_w(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
@@ -359,15 +353,12 @@ static void handle_ldc2_w(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
         Cat2 cat2;
         cat2.double_ = value;
         operand_stack_push_cat2(stack, cat2);
-        fprintf(stderr, "ldc2_w: %d", value);
     } else if (constant_pool_entry->tag == CONSTANT_Long) {
         int64_t value = constant_pool_entry->info.Long.bytes;
         Cat2 cat2;
         cat2.long_ = value;
         operand_stack_push_cat2(stack, cat2);
-        fprintf(stderr, "ldc2_w: %d", value);
     } else {
-        fprintf(stderr, "ldc2_w: Constant pool entry is not a double or long\n");
         return; 
     }
 
@@ -404,43 +395,10 @@ static void handle_iconst_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSt
     (*pc)++;
 }
 
-static void handle_invokespecial(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    uint16_t index = (bytecode[*pc + 1] << 8) | bytecode[*pc + 2];
-    *pc += 3; // Advance pc *before* invoking
-
-    cp_info *methodref = &jvm->class_file.constant_pool[index - 1];
-    if (methodref->tag == CONSTANT_Methodref) {
-        invoke_method(jvm, methodref); // Use the existing invoke_method
-    }
-}
-
-//! df is this todo !
-static void handle_checkcast(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
-    int32_t objref;
-    operand_stack_pop(stack, &objref);
-
-    if (objref == 0) { // null is always an instance of any class
-        operand_stack_push(stack, objref);
-        *pc += 3;
-        return;
-    }
-
-    Object *obj = (Object *)(intptr_t)objref;
-    cp_info *class_info = &jvm->class_file.constant_pool[index - 1];
-
-    if (class_info->tag == CONSTANT_Class) {
-        // Basic check, more detailed type checking might be needed.
-        operand_stack_push(stack, objref);
-        *pc += 3;
-    } else {
-        fprintf(stderr, "checkcast: invalid constant pool entry\n");
-    }
-}
 
 
 static void handle_return(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    (*pc)++; // Increment pc before returning
+    (*pc)++; 
 }
 
 static void handle_laload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -479,7 +437,6 @@ static void handle_dstore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
     locals[index] = value;
     operand_stack_pop(stack, &value);
     locals[index] = value;
-    fprintf("DSTORE %d: Stored %d\n", index, value);
     *pc += 2;
 }
 
@@ -487,7 +444,6 @@ static void handle_dstore_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSt
     Cat2 value = operand_stack_pop_cat2(stack);
     locals[1] = value.high;
     locals[2] = value.low;
-    fprintf("DSTORE %d: Stored %d\n", 1, value);
     (*pc)++;
 }
 
@@ -495,7 +451,6 @@ static void handle_dstore_2(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSt
     Cat2 value = operand_stack_pop_cat2(stack);
     locals[2] = value.high;
     locals[3] = value.low;
-    fprintf("DSTORE %d: Stored %d\n", 2, value);
     (*pc)++;
 }
 
@@ -503,18 +458,14 @@ static void handle_dstore_3(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSt
     Cat2 value = operand_stack_pop_cat2(stack);
     locals[3] = value.high;
     locals[4] = value.low;
-    fprintf("DSTORE %d: Stored %d\n", 3, value);
     (*pc)++;
 }
-
-//! todo fix?
+// todo check if this is correct
 static void handle_lastore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     Cat2 value = operand_stack_pop_cat2(stack);
     int32_t index, arrayref;
     operand_stack_pop(stack, &index);
     operand_stack_pop(stack, &arrayref);
-
-    fprintf(stderr, "todo fix lastore", index, arrayref); //!
 
     Array *array = (Array*)(intptr_t)arrayref;
     if (!array || index < 0 || index >= array->length || array->type != ARRAY_TYPE_LONG) {
@@ -557,9 +508,7 @@ static void handle_ddiv(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     Cat2 val1 = operand_stack_pop_cat2(stack);
 
     if (val2.double_ == 0.0) {
-        fprintf(stderr, "ArithmeticException: Division by zero\n");
-        // Handle the exception 
-        fprintf(stderr, "ArrayIndexOutOfBoundsException\n");
+        fprintf(stderr, "Division by zero\n");
         return; 
     }
 
@@ -818,6 +767,15 @@ static void handle_invokevirtual(JVM *jvm, uint8_t *bytecode, uint32_t *pc, Oper
 static instruction_handler instruction_table[256] = {0};  // Initialize all to NULL
 
 static void init_instruction_table(void) {
+
+    instruction_table[INVOKEVIRTUAL] = handle_invokevirtual;
+    instruction_table[LNEG] = handle_lneg;
+    instruction_table[DSTORE] = handle_dstore;
+    instruction_table[RETURN] = handle_return;
+    instruction_table[ICONST_1] = handle_iconst_1; 
+    instruction_table[IFNE] = handle_ifne;
+    instruction_table[IF_ICMPEQ] = handle_if_icmpeq;
+
     instruction_table[NOP] = handle_nop;
     instruction_table[ICONST_M1] = handle_iconst;
     instruction_table[ICONST_0] = handle_iconst;
