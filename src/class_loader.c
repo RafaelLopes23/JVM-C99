@@ -18,6 +18,10 @@
 #define CONSTANT_MethodHandle      15
 #define CONSTANT_MethodType        16
 #define CONSTANT_InvokeDynamic     18
+#define ARRAY_TYPE_INT    10
+#define ARRAY_TYPE_LONG   11
+#define ARRAY_TYPE_FLOAT  6
+#define ARRAY_TYPE_DOUBLE 7
 
 void jvm_load_class(JVM *jvm, const char *class_file);
 void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size);
