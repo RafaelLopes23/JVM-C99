@@ -63,7 +63,7 @@ void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size) {
         // Lê o tag do pool de constantes
         class_file.constant_pool[i].tag = *ptr++;
         // Parseia as entradas do pool de constantes com base no tag
-        printf("Parsing constant pool entry %d with tag %d\n", i + 1, class_file.constant_pool[i].tag);
+        //printf("Parsing constant pool entry %d with tag %d\n", i + 1, class_file.constant_pool[i].tag);
         
         switch (class_file.constant_pool[i].tag) {
             case CONSTANT_Class:
@@ -296,18 +296,14 @@ void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size) {
 }
 
 void jvm_load_class(JVM *jvm, const char *class_file) {
-    printf("Loading class file: %s\n", class_file);
     FILE *file = fopen(class_file, "rb");
     if (file == NULL) {
         fprintf(stderr, "Error opening file: %s\n", class_file);
-        perror("Error");
         return;
     }
-    printf("File opened successfully\n");
 
     fseek(file, 0, SEEK_END);
     long file_size = ftell(file);
-    printf("File size: %ld bytes\n", file_size);
     fseek(file, 0, SEEK_SET);
 
     uint8_t *buffer = (uint8_t *)malloc(file_size);
@@ -316,19 +312,15 @@ void jvm_load_class(JVM *jvm, const char *class_file) {
         fclose(file);
         return;
     }
-    printf("Buffer allocated\n");
 
-    size_t read_size = fread(buffer, 1, file_size, file);
-    if (read_size != file_size) {
-        fprintf(stderr, "Erro ao ler arquivo: %s\n", class_file);
+    if (fread(buffer, 1, file_size, file) != file_size) {
+        fprintf(stderr, "Error reading file\n");
         free(buffer);
         fclose(file);
         return;
     }
 
-    // Parse the class file
     parse_class_file(jvm, buffer, file_size);
-
     free(buffer);
     fclose(file);
 }
