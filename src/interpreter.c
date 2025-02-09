@@ -5,7 +5,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <inttypes.h>
-#include <math.h> // pro handle_drem
+
+// pro DREM e FREM
+#define IS_NAN(x)  ((*(uint64_t*)&(x) & 0x7FF8000000000000ULL) == 0x7FF8000000000000ULL)
+#define IS_INF(x) (((*(uint64_t*)&(x) & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL) && !IS_NAN(x))
 
 
 #define CONSTANT_Class              7
@@ -272,19 +275,19 @@ static void handle_drem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     double value2 = val2.double_;
 
 
-    if (isnan(value1) || isnan(value2) || isinf(value1) || value2 == 0.0 || isinf(value2)) {
+    if (IS_NAN(value1) || IS_NAN(value2) || IS_INF(value1) || value2 == 0.0 || IS_INF(value2)) {
         fprintf(stderr, "!!Operando invalido (drem)\n");
         (*pc)++;
         return;
     }
 
-    if (value1 == 0.0 && !isinf(value2) && value2 != 0.0) {
+    if (value1 == 0.0 && !IS_INF(value2) && value2 != 0.0) {
         operand_stack_push_cat2(stack, val1);
         (*pc)++;
         return;
     }
 
-    if (!isinf(value1) && isinf(value2)) {
+    if (!IS_INF(value1) && IS_INF(value2)) {
         operand_stack_push_cat2(stack, val1);
         (*pc)++;
         return;
@@ -506,9 +509,7 @@ static void handle_dcmpl(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack
     Cat2 val1 = operand_stack_pop_cat2(stack);
     int32_t result;
 
-    if (isnan(val1.double_) || isnan(val2.double_)) {
-        result = -1;
-    } else if (val1.double_ > val2.double_) {
+    if (val1.double_ > val2.double_) {
         result = 1;
     } else if (val1.double_ == val2.double_) {
         result = 0;
@@ -525,7 +526,7 @@ static void handle_dcmpg(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack
     Cat2 val1 = operand_stack_pop_cat2(stack);
     int32_t result;
 
-    if (isnan(val1.double_) || isnan(val2.double_)) {
+    if (IS_NAN(val1.double_) || IS_NAN(val2.double_)) {
         result = 1;
     } else if (val1.double_ > val2.double_) {
         result = 1;
