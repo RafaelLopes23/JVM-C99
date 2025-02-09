@@ -839,10 +839,6 @@ bool test_op_stack_empty(OperandStack *stack);
 bool test_op_stack_overflow(OperandStack *stack);
 bool test_op_stack_underflow(OperandStack *stack);
 
-Cat2 pop_cat2_from_op_stack(); 
-Cat2 push_cat2_to_op_stack( uint32_t  HighBytes,  uint32_t  LowBytes); 
-
-
 const char* get_utf8_from_constant_pool(ClassFile *class_file, uint16_t index) {
     if (!validate_constant_pool_index(class_file, index)) {
         return NULL;
