@@ -157,8 +157,6 @@ typedef enum {
     FCONST_2 = 0x0D,
     DCONST_0 = 0x0E,
     DCONST_1 = 0x0F,
-
-    
     
     // Push values
     BIPUSH = 0x10,
@@ -166,6 +164,7 @@ typedef enum {
     
     // Loads
     ILOAD = 0X15,
+    // TODO: test
     ILOAD_0 = 0x1A,
     ILOAD_1 = 0x1B,
     ILOAD_2 = 0x1C,
@@ -173,14 +172,11 @@ typedef enum {
 
     LLOAD = 0x16,
     FLOAD = 0x17,
-    // todo: test
     DLOAD = 0x18,
-
-    FLOAD_0 = 0X22,
-    FLOAD_1 = 0X23,
-    FLOAD_2 = 0X24,
-    FLOAD_3 = 0X25,
-
+    FLOAD_0 =0X22,
+    FLOAD_1 =0X23,
+    FLOAD_2 =0X24,
+    FLOAD_3 =0X25,
     DLOAD_0 = 0x26,
     DLOAD_1 = 0x27,
     DLOAD_2 = 0x28,
@@ -276,12 +272,6 @@ typedef enum {
 
 } Bytecode;
 
-typedef struct {
-    int32_t *values;
-    int size;
-    int capacity;
-} OperandStack;
-
 // unions for bytecode operands
 typedef union {
     struct{
@@ -293,6 +283,12 @@ typedef union {
     int64_t  long_;
     double    double_;
 } Cat2;
+
+typedef struct {
+    int32_t *values;
+    int size;
+    int capacity;
+} OperandStack;
 
 void jvm_init(JVM *jvm);
 void jvm_load_class(JVM *jvm, const char *class_file);
@@ -311,7 +307,5 @@ void stack_push(JVMStack *stack, int32_t value);
 int32_t stack_pop(JVMStack *stack);
 
 void invoke_method(JVM *jvm, void *method_handle);
-
-
 
 #endif // JVM_H
