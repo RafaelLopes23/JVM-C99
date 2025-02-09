@@ -6,6 +6,11 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
+// pro DREM e FREM
+#define IS_NAN(x)  ((*(uint64_t*)&(x) & 0x7FF8000000000000ULL) == 0x7FF8000000000000ULL)
+#define IS_INF(x) (((*(uint64_t*)&(x) & 0x7FF0000000000000ULL) == 0x7FF0000000000000ULL) && !IS_NAN(x))
+
+
 #define CONSTANT_Class              7
 #define CONSTANT_Fieldref           9
 #define CONSTANT_Methodref          10
@@ -145,6 +150,33 @@ static void handle_iload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack
     *pc += 2;
 }
 
+static void handle_fload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t opcode = bytecode[*pc];
+    uint8_t index ;
+    if(opcode == FLOAD)
+        index = bytecode[(*pc) + 1];
+    else
+        index = opcode - FLOAD_0;
+    operand_stack_push(stack, locals[index]); 
+    (*pc)++;
+}
+
+
+// Load/Store operations
+static void handle_dload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t opcode = bytecode[*pc];
+    uint8_t index ;
+    if(opcode == DLOAD)
+        index = bytecode[(*pc) + 1];
+    else
+        index = opcode - DLOAD_0;
+    Cat2 value;
+    value.low = locals[index];
+    value.high = locals[index + 1];
+    operand_stack_push_cat2(stack, value);
+    *pc += 2;
+}
+
 static void handle_istore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     uint8_t index = bytecode[(*pc) + 1];
     int32_t value;
@@ -179,6 +211,397 @@ static void handle_dadd(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     result.double_ = val1.double_ + val2.double_;
     operand_stack_push_cat2(stack, result);
     printf("DADD: %f + %f = %f\n", val1.double_, val2.double_, result.double_);
+    (*pc)++;
+}
+
+static void handle_ladd(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.long_ = val1.long_ + val2.long_; 
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_lsub(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.long_ = val1.long_ - val2.long_;
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_lmul(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.long_ = val1.long_ * val2.long_;
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_ldiv(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    if (val2.long_ == 0) {
+        fprintf(stderr, "Divisão por zero\n");
+        return; 
+    }
+    Cat2 result;
+    result.long_ = val1.long_ / val2.long_;
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_lrem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    if (val2.long_ == 0) {
+        fprintf(stderr, "Divisão por zero\n");
+        return; 
+    }
+    Cat2 result;
+    result.long_ = val1.long_ % val2.long_;
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_drem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+
+    double value1 = val1.double_;
+    double value2 = val2.double_;
+
+
+    if (IS_NAN(value1) || IS_NAN(value2) || IS_INF(value1) || value2 == 0.0 || IS_INF(value2)) {
+        fprintf(stderr, "!!Operando invalido (drem)\n");
+        (*pc)++;
+        return;
+    }
+
+    if (value1 == 0.0 && !IS_INF(value2) && value2 != 0.0) {
+        operand_stack_push_cat2(stack, val1);
+        (*pc)++;
+        return;
+    }
+
+    if (!IS_INF(value1) && IS_INF(value2)) {
+        operand_stack_push_cat2(stack, val1);
+        (*pc)++;
+        return;
+    }
+
+
+    long long int_q = (long long) value1 / value2;
+
+    double result = value1 - (value2 * int_q);
+
+    val1.double_ = result; 
+    operand_stack_push_cat2(stack, val1);
+    (*pc)++;
+}
+
+// Carregamento de Constantes (long e double)
+static void handle_lconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int64_t value = bytecode[*pc] - LCONST_0; 
+    Cat2 cat2;
+    cat2.long_ = value;
+    operand_stack_push_cat2(stack, cat2);
+    (*pc)++;
+}
+
+static void handle_dconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    double value = bytecode[*pc] - DCONST_0; 
+    Cat2 cat2;
+    cat2.double_ = value;
+    operand_stack_push_cat2(stack, cat2);
+    (*pc)++;
+}
+
+
+static void handle_ldc2_w(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+
+    if (!validate_constant_pool_index(&jvm->class_file, index)) {
+        fprintf(stderr, "ldc2_w: Invalid constant pool index\n");
+        return; 
+    }
+
+    cp_info *constant_pool_entry = &jvm->class_file.constant_pool[index - 1];
+
+    if (constant_pool_entry->tag == CONSTANT_Double) {
+        double value = constant_pool_entry->info.Double.bytes;
+        Cat2 cat2;
+        cat2.double_ = value;
+        operand_stack_push_cat2(stack, cat2);
+    } else if (constant_pool_entry->tag == CONSTANT_Long) {
+        int64_t value = constant_pool_entry->info.Long.bytes;
+        Cat2 cat2;
+        cat2.long_ = value;
+        operand_stack_push_cat2(stack, cat2);
+    } else {
+        return; 
+    }
+
+    *pc += 3;
+}
+
+
+
+static void handle_if_icmpeq(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t val2, val1;
+    operand_stack_pop(stack, &val2);
+    operand_stack_pop(stack, &val1);
+    int16_t branch_offset = (int16_t)((bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2]);
+    if (val1 == val2) {
+        *pc += branch_offset;
+    } else {
+        *pc += 3;
+    }
+}
+
+static void handle_ifne(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    int16_t branch_offset = (int16_t)((bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2]);
+    if (value != 0) {
+        *pc += branch_offset;
+    } else {
+        *pc += 3;
+    }
+}
+
+
+static void handle_return(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    (*pc)++; 
+}
+
+static void handle_laload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t index, arrayref;
+    operand_stack_pop(stack, &index);
+    operand_stack_pop(stack, &arrayref);
+
+    Array *array = (Array*)(intptr_t)arrayref;
+    if (!array || index < 0 || index >= array->length || array->type != ARRAY_TYPE_LONG) {
+        // Handle ArrayIndexOutOfBoundsException 
+        fprintf(stderr, "laload: ArrayIndexOutOfBoundsException\n");
+        return;
+    }
+
+    Cat2 result;
+    result.long_ = ((int64_t*)array->elements)[index];  // Correctly access long array //?
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+static void handle_land(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.long_ = val1.long_ & val2.long_;
+    operand_stack_push_cat2(stack, result);
+    (*pc)++;
+}
+
+
+
+static void handle_dstore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t index = bytecode[(*pc) + 1];
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    locals[index] = value;
+    operand_stack_pop(stack, &value);
+    locals[index] = value;
+    *pc += 2;
+}
+
+static void handle_dstore_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    locals[1] = value.high;
+    locals[2] = value.low;
+    (*pc)++;
+}
+
+static void handle_dstore_2(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    locals[2] = value.high;
+    locals[3] = value.low;
+    (*pc)++;
+}
+
+static void handle_dstore_3(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    locals[3] = value.high;
+    locals[4] = value.low;
+    (*pc)++;
+}
+// todo check if this is correct
+static void handle_lastore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    int32_t index, arrayref;
+    operand_stack_pop(stack, &index);
+    operand_stack_pop(stack, &arrayref);
+
+    Array *array = (Array*)(intptr_t)arrayref;
+    if (!array || index < 0 || index >= array->length || array->type != ARRAY_TYPE_LONG) {
+        // Handle ArrayIndexOutOfBoundsException 
+        fprintf(stderr, "!lastore: ArrayIndexOutOfBoundsException\n");
+        return;
+    }
+    locals[index] = value.high;
+    locals[index+1] = value.low;
+    (*pc)++;
+
+    ((int32_t*)array->elements)[index] = value.high; 
+    ((int32_t*)array->elements)[index+1] = value.low; 
+    (*pc)++;
+}
+
+
+static void handle_dsub(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.double_ = val1.double_ - val2.double_;
+    operand_stack_push_cat2(stack, result);
+    printf("DSUB: %f - %f = %f\n", val1.double_, val2.double_, result.double_);
+    (*pc)++;
+}
+
+static void handle_dmul(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    Cat2 result;
+    result.double_ = val1.double_ * val2.double_;
+    operand_stack_push_cat2(stack, result);
+    printf("DMUL: %f * %f = %f\n", val1.double_, val2.double_, result.double_);
+    (*pc)++;
+}
+
+static void handle_ddiv(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+
+    if (val2.double_ == 0.0) {
+        fprintf(stderr, "Division by zero\n");
+        return; 
+    }
+
+    Cat2 result;
+    result.double_ = val1.double_ / val2.double_;
+    operand_stack_push_cat2(stack, result);
+    printf("DDIV: %f / %f = %f\n", val1.double_, val2.double_, result.double_);
+    (*pc)++;
+}
+
+static void handle_dneg(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    value.double_ = -value.double_;
+    operand_stack_push_cat2(stack, value);
+    printf("DNEG: -%f = %f\n", -value.double_, value.double_); // Corrected print statement
+    (*pc)++;
+}
+
+static void handle_dcmpl(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    int32_t result;
+
+    if (val1.double_ > val2.double_) {
+        result = 1;
+    } else if (val1.double_ == val2.double_) {
+        result = 0;
+    } else {
+        result = -1;
+    }
+
+    operand_stack_push(stack, result);
+    (*pc)++;
+}
+
+static void handle_dcmpg(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    int32_t result;
+
+    if (IS_NAN(val1.double_) || IS_NAN(val2.double_)) {
+        result = 1;
+    } else if (val1.double_ > val2.double_) {
+        result = 1;
+    } else if (val1.double_ == val2.double_) {
+        result = 0;
+    } else {
+        result = -1;
+    }
+
+    operand_stack_push(stack, result);
+    (*pc)++;
+}
+
+
+static void handle_d2f(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 double_val = operand_stack_pop_cat2(stack);
+    float float_val = (float)double_val.double_;
+
+    operand_stack_push(stack, *((int32_t*)&float_val)); // Push the float bits
+
+    (*pc)++;
+}
+
+static void handle_d2i(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 double_val = operand_stack_pop_cat2(stack);
+    int32_t int_val = (int32_t)double_val.double_;
+
+    operand_stack_push(stack, int_val);
+    (*pc)++;
+}
+
+static void handle_d2l(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 double_val = operand_stack_pop_cat2(stack);
+    int64_t long_val = (int64_t)double_val.double_;
+
+    Cat2 result;
+    result.long_ = long_val;
+    operand_stack_push_cat2(stack, result);
+
+    (*pc)++;
+}
+
+static void handle_lcmp(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 val2 = operand_stack_pop_cat2(stack);
+    Cat2 val1 = operand_stack_pop_cat2(stack);
+    int32_t result;
+
+    if (val1.long_ > val2.long_) {
+        result = 1;
+    } else if (val1.long_ == val2.long_) {
+        result = 0;
+    } else {
+        result = -1;
+    }
+    operand_stack_push(stack, result);
+    (*pc)++;
+}
+
+static void handle_lload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t opcode = bytecode[*pc];
+    uint8_t index;
+    if(opcode == LLOAD)
+        index = bytecode[(*pc) + 1];
+    else
+        index = opcode - LLOAD_0;
+    operand_stack_push(stack, locals[index]);       
+    operand_stack_push(stack, locals[index + 1]);  
+    *pc += 2;
+}
+
+
+static void handle_lneg(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    Cat2 value = operand_stack_pop_cat2(stack);
+    value.long_ = -value.long_;
+    operand_stack_push_cat2(stack, value);
     (*pc)++;
 }
 
@@ -294,6 +717,14 @@ static void handle_invokevirtual(JVM *jvm, uint8_t *bytecode, uint32_t *pc, Oper
 static instruction_handler instruction_table[256] = {0};  // Initialize all to NULL
 
 static void init_instruction_table(void) {
+
+    instruction_table[INVOKEVIRTUAL] = handle_invokevirtual;
+    instruction_table[LNEG] = handle_lneg;
+    instruction_table[DSTORE] = handle_dstore;
+    instruction_table[RETURN] = handle_return;
+    instruction_table[IFNE] = handle_ifne;
+    instruction_table[IF_ICMPEQ] = handle_if_icmpeq;
+
     instruction_table[NOP] = handle_nop;
     instruction_table[ICONST_M1] = handle_iconst;
     instruction_table[ICONST_0] = handle_iconst;
@@ -311,7 +742,64 @@ static void init_instruction_table(void) {
     instruction_table[ISTORE] = handle_istore;
     instruction_table[DUP] = handle_dup;
     instruction_table[POP] = handle_pop;
+
+    instruction_table[FLOAD] = handle_fload;
+    instruction_table[FLOAD_1] = handle_fload;
+    instruction_table[FLOAD_2] = handle_fload;
+    instruction_table[FLOAD_3] = handle_fload;
+
     instruction_table[DADD] = handle_dadd;
+    instruction_table[DLOAD] = handle_dload;
+    instruction_table[DLOAD_1] = handle_dload;
+    instruction_table[DLOAD_2] = handle_dload;
+    instruction_table[DLOAD_3] = handle_dload;
+
+    instruction_table[DREM] = handle_drem;
+    instruction_table[DSUB] = handle_dsub;
+    instruction_table[DMUL] = handle_dmul;
+    instruction_table[DDIV] = handle_ddiv;
+    instruction_table[DNEG] = handle_dneg;
+
+
+    instruction_table[LADD] = handle_ladd;
+    instruction_table[LSUB] = handle_lsub;
+    instruction_table[LMUL] = handle_lmul;
+    instruction_table[LDIV] = handle_ldiv;
+    instruction_table[LREM] = handle_lrem;
+
+    instruction_table[LDC2_W] = handle_ldc2_w;;
+    
+    instruction_table[DCONST_0] = handle_dconst;
+    instruction_table[DCONST_1] = handle_dconst;
+    instruction_table[LCONST_0] = handle_lconst;
+    instruction_table[LCONST_1] = handle_lconst;
+
+    instruction_table[LLOAD] = handle_lload;
+    instruction_table[LLOAD_0] = handle_lload;
+    instruction_table[LLOAD_1] = handle_lload;
+    instruction_table[LLOAD_2] = handle_lload;
+    instruction_table[LLOAD_3] = handle_lload;
+
+    instruction_table[LCMP] = handle_lcmp;
+    instruction_table[LASTORE] = handle_lastore;
+    instruction_table[LAND] = handle_land;
+    instruction_table[LALOAD] = handle_laload;
+
+    instruction_table[NOP] = handle_nop;
+    instruction_table[DSTORE_1] = handle_dstore_1;
+    instruction_table[DSTORE_2] = handle_dstore_2;
+    instruction_table[DSTORE_3] = handle_dstore_3;
+
+
+    instruction_table[DCMPL] = handle_dcmpl;
+    instruction_table[DCMPG] = handle_dcmpg;
+
+    instruction_table[D2F] = handle_d2f;
+    instruction_table[D2I] = handle_d2i;
+    instruction_table[D2L] = handle_d2l;
+    
+
+
     instruction_table[NEW] = handle_new;
     instruction_table[NEWARRAY] = handle_newarray;
     instruction_table[IASTORE] = handle_iastore;
@@ -351,10 +839,6 @@ void print_operation(const char* op, int32_t val1, int32_t val2, int32_t result)
 bool test_op_stack_empty(OperandStack *stack);
 bool test_op_stack_overflow(OperandStack *stack);
 bool test_op_stack_underflow(OperandStack *stack);
-
-Cat2 pop_cat2_from_op_stack(); 
-Cat2 push_cat2_to_op_stack( uint32_t  HighBytes,  uint32_t  LowBytes); 
-
 
 const char* get_utf8_from_constant_pool(ClassFile *class_file, uint16_t index) {
     if (!validate_constant_pool_index(class_file, index)) {
