@@ -63,7 +63,7 @@ void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size) {
         // Lê o tag do pool de constantes
         class_file.constant_pool[i].tag = *ptr++;
         // Parseia as entradas do pool de constantes com base no tag
-        printf("Parsing constant pool entry %d with tag %d\n", i + 1, class_file.constant_pool[i].tag);
+        //printf("Parsing constant pool entry %d with tag %d\n", i + 1, class_file.constant_pool[i].tag);
         
         switch (class_file.constant_pool[i].tag) {
             case CONSTANT_Class:
@@ -296,18 +296,14 @@ void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size) {
 }
 
 void jvm_load_class(JVM *jvm, const char *class_file) {
-    printf("Loading class file: %s\n", class_file);
     FILE *file = fopen(class_file, "rb");
     if (file == NULL) {
         fprintf(stderr, "Error opening file: %s\n", class_file);
-        perror("Error");
         return;
     }
-    printf("File opened successfully\n");
 
     fseek(file, 0, SEEK_END);
     long file_size = ftell(file);
-    printf("File size: %ld bytes\n", file_size);
     fseek(file, 0, SEEK_SET);
 
     uint8_t *buffer = (uint8_t *)malloc(file_size);
@@ -316,19 +312,15 @@ void jvm_load_class(JVM *jvm, const char *class_file) {
         fclose(file);
         return;
     }
-    printf("Buffer allocated\n");
 
-    size_t read_size = fread(buffer, 1, file_size, file);
-    if (read_size != file_size) {
-        fprintf(stderr, "Erro ao ler arquivo: %s\n", class_file);
+    if (fread(buffer, 1, file_size, file) != file_size) {
+        fprintf(stderr, "Error reading file\n");
         free(buffer);
         fclose(file);
         return;
     }
 
-    // Parse the class file
     parse_class_file(jvm, buffer, file_size);
-
     free(buffer);
     fclose(file);
 }
@@ -369,10 +361,27 @@ void parse_constant_pool(ClassFile *class_file, uint8_t *buffer, uint16_t consta
                                                               ((int64_t)ptr[4] << 24) | ((int64_t)ptr[5] << 16) | ((int64_t)ptr[6] << 8) | (int64_t)ptr[7];
                 ptr += 8;
                 break;
-            case 6: // CONSTANT_Double
-                class_file->constant_pool[i].info.Double.bytes = *(double *)ptr;
-                ptr += 8;
-                break;
+            case 6: {
+                    uint8_t bytes[8];
+                    memcpy(bytes, ptr, 8);
+                    ptr += 8;
+                
+                    // Reverse bytes if the host is little-endian
+                    #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+                        uint8_t temp;
+                        for (int j = 0; j < 4; j++) {
+                            temp = bytes[j];
+                            bytes[j] = bytes[7 - j];
+                            bytes[7 - j] = temp;
+                        }
+                    #endif
+                
+                    double value;
+                    memcpy(&value, bytes, sizeof(double));
+                    class_file->constant_pool[i].info.Double.bytes = value;
+                    i++; // Skip next entry
+                    break;
+                }
             case 12: // CONSTANT_NameAndType
                 class_file->constant_pool[i].info.NameAndType.name_index = (ptr[0] << 8) | ptr[1];
                 ptr += 2;

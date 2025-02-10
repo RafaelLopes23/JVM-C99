@@ -9,6 +9,16 @@
 #define ARRAY_TYPE_LONG   11
 #define ARRAY_TYPE_FLOAT  6
 #define ARRAY_TYPE_DOUBLE 7
+// Array Type Constants
+#define T_BOOLEAN   4
+#define T_CHAR      5
+#define T_FLOAT     6
+#define T_DOUBLE    7
+#define T_BYTE      8
+#define T_SHORT     9
+#define T_INT       10
+#define T_LONG      11
+
 
 typedef struct {
     uint8_t tag;
@@ -107,9 +117,19 @@ typedef struct {
 } ClassFile;
 
 typedef struct {
+    int32_t length;
+    uint8_t type;
+    void *elements;
+    size_t element_size;  // Add element size field
+} Array;
+
+typedef struct {
     uint8_t *heap;
     size_t heap_size;
     size_t heap_top;
+    Array **arrays;         // Array of pointers
+    uint32_t array_count;   // Current number of arrays
+    uint32_t array_cap;     // Capacity of the array
 } Heap;
 
 typedef struct {
@@ -133,14 +153,16 @@ typedef struct {
 
 
 typedef enum {
-
     GETSTATIC = 0xB2,
-    INVOKEVIRTUAL = 0xB6,
 
-    LDC = 0x12,
-    LDC_W = 0x13,
+    // Load operations
+    ALOAD = 0x19,        // Load reference from local variable
+    ALOAD_0 = 0x2A,      // Load reference from local variable 0
+    ALOAD_1 = 0x2B,      // Load reference from local variable 1
+    ALOAD_2 = 0x2C,      // Load reference from local variable 2
+    ALOAD_3 = 0x2D,      // Load reference from local variable 3
 
-   // Constants
+    // Constants
     NOP = 0x00,
     ACONST_NULL = 0x01,
     ICONST_M1 = 0x02,
@@ -162,62 +184,81 @@ typedef enum {
     BIPUSH = 0x10,
     SIPUSH = 0x11,
     
+    // Load constant operations
+    LDC = 0x12,          // Push item from constant pool
+    LDC_W = 0x13,        // Push item from constant pool (wide index)
+    LDC2_W = 0x14,       // Push long or double from constant pool
+
     // Loads
     ILOAD = 0X15,
-    // TODO: test
     ILOAD_0 = 0x1A,
     ILOAD_1 = 0x1B,
     ILOAD_2 = 0x1C,
     ILOAD_3 = 0x1D,
-
     LLOAD = 0x16,
+    LLOAD_0 = 0x1E,
+    LLOAD_1 = 0x1F,
+    LLOAD_2 = 0x20,
+    LLOAD_3 = 0x21,
     FLOAD = 0x17,
     DLOAD = 0x18,
-    FLOAD_0 =0X22,
-    FLOAD_1 =0X23,
-    FLOAD_2 =0X24,
-    FLOAD_3 =0X25,
+    FLOAD_0 = 0X22,
+    FLOAD_1 = 0X23,
+    FLOAD_2 = 0X24,
+    FLOAD_3 = 0X25,
     DLOAD_0 = 0x26,
     DLOAD_1 = 0x27,
     DLOAD_2 = 0x28,
     DLOAD_3 = 0x29,
 
+    // Array load operations
+    IALOAD = 0x2E,       // Load int from array
+    LALOAD = 0x2F,       // Load long from array
+    FALOAD = 0x30,       // Load float from array
+    DALOAD = 0x31,       // Load double from array
+    AALOAD = 0x32,       // Load reference from array
+    BALOAD = 0x33,       // Load byte/boolean from array
+    CALOAD = 0x34,       // Load char from array
+    SALOAD = 0x35,       // Load short from array
 
-// longs
-    LALOAD = 0x2e,
-    LAND = 0x7e,
-    LASTORE = 0x4f,
-    LCMP = 0x94,
-    LLOAD_0 = 0x1a,
-    LLOAD_1 = 0x1b,
-    LLOAD_2 = 0x1c,
-    LLOAD_3 = 0x1d,
-    LNEG = 0x74,
-    LADD = 0x61, 
-    LSUB = 0x65,  
-    LMUL = 0x69,  
-    LDIV = 0x6d,  
-    LREM = 0x71, 
+    // Store operations
+    ASTORE = 0x3A,       // Store reference into local variable
+    ASTORE_0 = 0x4B,     // Store reference into local variable 0
+    ASTORE_1 = 0x4C,     // Store reference into local variable 1
+    ASTORE_2 = 0x4D,     // Store reference into local variable 2
+    ASTORE_3 = 0x4E,     // Store reference into local variable 3
 
-    DREM = 0x73,  
-    
-
-    // Stores
     ISTORE = 0x36,
-    // TODO: test
     ISTORE_0 = 0x3B,
     ISTORE_1 = 0x3C,
     ISTORE_2 = 0x3D,
-    ISTORE_3 = 0x3E, 
+    ISTORE_3 = 0x3E,
 
     LSTORE = 0x37,
+    LSTORE_0 = 0x3F,
+    LSTORE_1 = 0x40,
+    LSTORE_2 = 0x41,
+    LSTORE_3 = 0x42,
     FSTORE = 0x38,
-
+    FSTORE_0 = 0x43,
+    FSTORE_1 = 0x44,
+    FSTORE_2 = 0x45,
+    FSTORE_3 = 0x46,
     DSTORE = 0x39,
     DSTORE_0 = 0x47,
     DSTORE_1 = 0x48,
     DSTORE_2 = 0x49,
-    DSTORE_3 = 0x4a, 
+    DSTORE_3 = 0x4a,
+
+    // Array store operations
+    IASTORE = 0x4F,      // Store into int array
+    LASTORE = 0x50,      // Store into long array
+    FASTORE = 0x51,      // Store into float array
+    DASTORE = 0x52,      // Store into double array
+    AASTORE = 0x53,      // Store into reference array
+    BASTORE = 0x54,      // Store into byte/boolean array
+    CASTORE = 0x55,      // Store into char array
+    SASTORE = 0x56,      // Store into short array
     
     // Stack
     POP = 0x57,
@@ -229,46 +270,63 @@ typedef enum {
     IMUL = 0x68,
     IDIV = 0x6C,
     IOR = 0x80,
-
     DADD = 0x63,
-    
-    NEW = 0xBB,
-    NEWARRAY = 0xBC,
-    IASTORE = 0x4F,
-
-    // Method invocation
-    INVOKEDYNAMIC = 0xBA,
-
-    
-    INSTANCEOF = 0xBF,
-
-    // branch todo 
-    IFEQ = 0x99,
-    IFNE = 0x9A,  
-    IFLT = 0x9B,  
-    IFGE = 0x9C,
-    IFGT = 0x9D,
-    IFLE = 0x9E,
-    IF_ICMPEQ = 0x9F,
- 
-    LDC2_W = 0x14,
-
     DSUB = 0x67,
     DMUL = 0x6B,
     DDIV = 0x6F,
+    DREM = 0x73,
     DNEG = 0x77,
 
+    LADD = 0x61,
+    LSUB = 0x65,
+    LMUL = 0x69,
+    LDIV = 0x6D,
+    LREM = 0x71,
+    LNEG = 0x74,
+    LAND = 0x7e,
+
+    // Comparison
+    LCMP = 0x94,
     DCMPL = 0X97,
     DCMPG = 0X98,
+
+    // Conversion
     D2F = 0X90,
     D2I = 0X8E,
     D2L = 0X8F,
 
-    INVOKESPECIAL = 0xB7,
-    CHECKCAST = 0xC0,
+    // Branch
+    IFEQ = 0x99,
+    IFNE = 0x9A,
+    IFLT = 0x9B,
+    IFGE = 0x9C,
+    IFGT = 0x9D,
+    IFLE = 0x9E,
+    IF_ICMPEQ = 0x9F,
 
-    IRETURN = 0xB1,
-    RETURN = 0xb1,
+    // Return operations
+    RETURN = 0xB1,       // Return void from method
+    IRETURN = 0xAC,      // Return int from method
+    LRETURN = 0xAD,      // Return long from method
+    FRETURN = 0xAE,      // Return float from method
+    DRETURN = 0xAF,      // Return double from method
+    ARETURN = 0xB0,      // Return reference from method
+
+    // Method invocation
+    INVOKEVIRTUAL = 0xB6,    // Invoke instance method
+    INVOKESPECIAL = 0xB7,    // Invoke instance method (special handling)
+    INVOKESTATIC = 0xB8,     // Invoke static method 
+    INVOKEINTERFACE = 0xB9,  // Invoke interface method
+    INVOKEDYNAMIC = 0xBA,    // Invoke dynamic method
+
+    // Object operations
+    NEW = 0xBB,          // Create new object
+    NEWARRAY = 0xBC,     // Create new array
+    ANEWARRAY = 0xBD,    // Create new array of reference
+    ARRAYLENGTH = 0xBE,  // Get array length
+
+    INSTANCEOF = 0xBF,
+    CHECKCAST = 0xC0
 
 } Bytecode;
 
@@ -279,13 +337,13 @@ typedef union {
         uint32_t high;
     };
 	int32_t int_;
-    uint64_t    bytes_;
+    uint64_t    bytes;
     int64_t  long_;
     double    double_;
 } Cat2;
 
 typedef struct {
-    int32_t *values;
+    uint64_t *values;  // Change from int32_t to uint64_t
     int size;
     int capacity;
 } OperandStack;
@@ -293,10 +351,10 @@ typedef struct {
 void jvm_init(JVM *jvm);
 void jvm_load_class(JVM *jvm, const char *class_file);
 void jvm_execute(JVM *jvm);
-bool operand_stack_push(OperandStack *stack, int32_t value);
-bool operand_stack_pop(OperandStack *stack, int32_t *value);
-void operand_stack_push_cat2(OperandStack *stack, Cat2 val);
-Cat2 operand_stack_pop_cat2(OperandStack *stack);
+bool operand_stack_push(OperandStack *stack, uint64_t value);
+bool operand_stack_pop(OperandStack *stack, uint64_t *value);
+void operand_stack_push_cat2(OperandStack *stack, uint64_t value);
+uint64_t operand_stack_pop_cat2(OperandStack *stack);
 void operand_stack_init(OperandStack *stack, int capacity);
 bool validate_constant_pool_index(ClassFile *class_file, uint16_t index);
 void print_stack_state(OperandStack *stack);

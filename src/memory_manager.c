@@ -10,6 +10,10 @@ void jvm_init(JVM *jvm) {
     // Initialize JVM state
     printf("Initializing JVM\n");
 
+    jvm->heap.arrays = NULL;
+    jvm->heap.array_count = 0;
+    jvm->heap.array_cap = 0;
+
     // Initialize heap
     heap_init(&jvm->heap);
 
