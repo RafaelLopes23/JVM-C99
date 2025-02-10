@@ -1,0 +1,18 @@
+# Relatório de Contribuições do Grupo
+
+---
+
+### Membros e Contribuições:
+
+1. **[João Vitor Dickmann - 211042757]**  
+   - Tarefas realizadas:  
+    -Implementação do leitor-exibidor
+
+2. **[Rafael Lopes Cordeiro - 202033688]**  
+   - Tarefas realizadas:  
+    - Implementação de arquitetura e todos outros opcodes
+      
+  
+3. **[Regina Emy da Nobrega Kamada - 190037351]**  
+   - Tarefas realizadas:    
+     - Implementação do opcodes referentes a cat2,  nop, fload, fload_n, ifne, if_icmpe
