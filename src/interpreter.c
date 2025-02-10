@@ -142,13 +142,6 @@ static void handle_ior(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
 }
 
 // Load/Store operations
-static void handle_iload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    uint8_t index = bytecode[(*pc) + 1];
-    int32_t value = locals[index];
-    operand_stack_push(stack, value);
-    printf("ILOAD %d: Loaded %d\n", index, value);
-    *pc += 2;
-}
 
 static void handle_fload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     uint8_t opcode = bytecode[*pc];
@@ -177,13 +170,26 @@ static void handle_dload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack
     *pc += 2;
 }
 
-static void handle_istore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    uint8_t index = bytecode[(*pc) + 1];
+
+static void handle_istore_n(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t opcode = bytecode[*pc];
+    int32_t index = opcode - ISTORE_0;
     int32_t value;
     operand_stack_pop(stack, &value);
     locals[index] = value;
-    printf("ISTORE %d: Stored %d\n", index, value);
-    *pc += 2;
+    (*pc)++;
+}
+
+
+static void handle_iload_n(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint8_t opcode = bytecode[*pc];
+    int32_t index = opcode - ILOAD_0;
+    operand_stack_push(stack, locals[index]);
+    (*pc)++;
+}
+
+static void handle_return(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    (*pc)++;
 }
 
 // Stack operations
@@ -371,11 +377,6 @@ static void handle_ifne(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     } else {
         *pc += 3;
     }
-}
-
-
-static void handle_return(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    (*pc)++; 
 }
 
 static void handle_laload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -738,8 +739,14 @@ static void init_instruction_table(void) {
     instruction_table[IMUL] = handle_imul;
     instruction_table[IDIV] = handle_idiv;
     instruction_table[IOR] = handle_ior;
-    instruction_table[ILOAD] = handle_iload;
-    instruction_table[ISTORE] = handle_istore;
+    instruction_table[ILOAD_0] = handle_iload_n;
+    instruction_table[ILOAD_1] = handle_iload_n;
+    instruction_table[ILOAD_2] = handle_iload_n;
+    instruction_table[ILOAD_3] = handle_iload_n;
+    instruction_table[ISTORE_0] = handle_istore_n;
+    instruction_table[ISTORE_1] = handle_istore_n;
+    instruction_table[ISTORE_2] = handle_istore_n;
+    instruction_table[ISTORE_3] = handle_istore_n;
     instruction_table[DUP] = handle_dup;
     instruction_table[POP] = handle_pop;
 
@@ -803,6 +810,7 @@ static void init_instruction_table(void) {
     instruction_table[NEW] = handle_new;
     instruction_table[NEWARRAY] = handle_newarray;
     instruction_table[IASTORE] = handle_iastore;
+    instruction_table[IRETURN] = handle_return;
 }
 
 void check_stack_bounds(OperandStack *stack, int required_space) {
@@ -821,19 +829,25 @@ void print_operation(const char* op, int32_t val1, int32_t val2, int32_t result)
 }
 
 
-    void print_local_vars(int32_t *local_vars) {
-    printf("\nLocal Variables:\n");
-    printf("a (1): %d\n", local_vars[1]);
-    printf("b (2): %d\n", local_vars[2]);
-    printf("c (3): %d\n", local_vars[3]);
-    printf("d (4): %d\n", local_vars[4]);
-    printf("e (5): %d\n", local_vars[5]);
-    printf("sum (7): %d\n", local_vars[7]);
-    printf("diff (8): %d\n", local_vars[8]);
-    printf("prod (9): %d\n", local_vars[9]);
-    printf("quot (10): %d\n", local_vars[10]);
-    printf("or (11): %d\n", local_vars[11]);
+void print_local_vars(int32_t *local_vars) {
+    printf("\nFinal state:\n\n");
+    printf("Final Local Variables State:\n");
+    
+    bool printed = false;
+    
+    // For clarity, only print non-zero local variables
+    for (int i = 0; i < 256; i++) {
+        if (local_vars[i] != 0) {
+            printed = true;
+            printf("local_%d: %d\n", i, local_vars[i]);
+        }
+    }
+    
+    if (!printed) {
+        printf("(No non-zero local variables)\n");
+    }
 }
+
 
 // auxiliary functions for bytecode operands
 bool test_op_stack_empty(OperandStack *stack);
@@ -1021,8 +1035,8 @@ void *resolve_bootstrap_method(JVM *jvm, uint16_t bootstrap_method_attr_index,
 
 bool validate_constant_pool_index(ClassFile *class_file, uint16_t index) {
     // Add debug print
-    printf("Validating constant pool index: %d (pool count: %d)\n", 
-           index, class_file->constant_pool_count);
+    //printf("Validating constant pool index: %d (pool count: %d)\n", 
+     //      index, class_file->constant_pool_count);
     
     if (index == 0 || index >= class_file->constant_pool_count) {
         fprintf(stderr, "Invalid constant pool index: %d\n", index);
@@ -1036,7 +1050,6 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
     OperandStack operand_stack;
     operand_stack_init(&operand_stack, STACK_SIZE);
     
-    // Initialize instruction table if not already done
     static bool table_initialized = false;
     if (!table_initialized) {
         init_instruction_table();
@@ -1046,24 +1059,18 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
     uint32_t pc = 0;
     while (pc < bytecode_length) {
         uint8_t opcode = bytecode[pc];
-        printf("PC: %04x Opcode: 0x%02x\n", pc, opcode);
-
         instruction_handler handler = instruction_table[opcode];
+        
         if (handler) {
             handler(jvm, bytecode, &pc, &operand_stack, local_vars);
-            print_stack_state(&operand_stack);
         } else {
             fprintf(stderr, "Unknown opcode: 0x%02x\n", opcode);
             pc++;
         }
 
-        if (opcode == 0xb1) { // RETURN
-            break;
-        }
+        if (opcode == IRETURN) break;
     }
 
-    // Print final state
-    printf("\nFinal state:\n");
     print_local_vars(local_vars);
     free(operand_stack.values);
 }
