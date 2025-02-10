@@ -54,6 +54,20 @@ Execute a JVM com o arquivo compilado
 ```
 ./bin/jvm Test.class
 ```
+## Como Compilar e Executar o Leitor-Exibidor
+
+Compile
+```
+gcc -o leitor leitor-exibidor/main.c leitor-exibidor/auxiliar.c leitor-exibidor/read_func.c leitor-exibidor/display.c leitor-exibidor/read_count_func.c
+
+```
+
+Execute a o Leitor com o arquivo .class desejado
+
+```
+./leitor exemplos\Carta.class --leitor
+```
+Onde "--leitor" é a flag para chamar o leitor-exibidor
 
 ### Estrutura do Projeto
 
