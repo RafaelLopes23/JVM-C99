@@ -328,30 +328,33 @@ static void handle_dconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
 
 
 static void handle_ldc2_w(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+    // TODO 
 
-    if (!validate_constant_pool_index(&jvm->class_file, index)) {
-        fprintf(stderr, "ldc2_w: Invalid constant pool index\n");
-        return; 
-    }
 
-    cp_info *constant_pool_entry = &jvm->class_file.constant_pool[index - 1];
+    // uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
 
-    if (constant_pool_entry->tag == CONSTANT_Double) {
-        double value = constant_pool_entry->info.Double.bytes;
-        Cat2 cat2;
-        cat2.double_ = value;
-        operand_stack_push_cat2(stack, cat2);
-    } else if (constant_pool_entry->tag == CONSTANT_Long) {
-        int64_t value = constant_pool_entry->info.Long.bytes;
-        Cat2 cat2;
-        cat2.long_ = value;
-        operand_stack_push_cat2(stack, cat2);
-    } else {
-        return; 
-    }
+    // if (!validate_constant_pool_index(&jvm->class_file, index)) {
+    //     fprintf(stderr, "ldc2_w: Invalid constant pool index\n");
+    //     return; 
+    // }
 
-    *pc += 3;
+    // cp_info *constant_pool_entry = &jvm->class_file.constant_pool[index - 1];
+
+    // if (constant_pool_entry->tag == CONSTANT_Double) {
+    //     double value = constant_pool_entry->info.Double.bytes;
+    //     Cat2 cat2;
+    //     cat2.double_ = value;
+    //     operand_stack_push_cat2(stack, cat2);
+    // } else if (constant_pool_entry->tag == CONSTANT_Long) {
+    //     int64_t value = constant_pool_entry->info.Long.bytes;
+    //     Cat2 cat2;
+    //     cat2.long_ = value;
+    //     operand_stack_push_cat2(stack, cat2);
+    // } else {
+    //     return; 
+    // }
+
+    // *pc += 3;
 }
 
 
@@ -773,8 +776,8 @@ static void init_instruction_table(void) {
     instruction_table[LMUL] = handle_lmul;
     instruction_table[LDIV] = handle_ldiv;
     instruction_table[LREM] = handle_lrem;
-
-    instruction_table[LDC2_W] = handle_ldc2_w;;
+// TODO
+    // instruction_table[LDC2_W] = handle_ldc2_w;
     
     instruction_table[DCONST_0] = handle_dconst;
     instruction_table[DCONST_1] = handle_dconst;
