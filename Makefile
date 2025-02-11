@@ -5,21 +5,30 @@ SRC = src
 OBJ = obj
 BIN = bin
 
-SOURCES = $(wildcard $(SRC)/*.c)
-OBJECTS = $(SOURCES:$(SRC)/%.c=$(OBJ)/%.o)
-EXECUTABLE = $(BIN)/jvm
+# Lista de arquivos fonte no diretório src e no diretório leitor-exibidor
+SOURCES = $(wildcard $(SRC)/*.c) \
+          leitor-exibidor/auxiliar.c \
+          leitor-exibidor/read_func.c \
+          leitor-exibidor/display.c \
+          leitor-exibidor/read_count_func.c
+
+# Lista de objetos a serem gerados (substitui barras / por \ para Windows)
+OBJECTS = $(patsubst %.c, $(OBJ)\\%.o, $(SOURCES))
+EXECUTABLE = $(BIN)\\jvm.exe
 
 all: $(EXECUTABLE)
 
 $(EXECUTABLE): $(OBJECTS)
-	@mkdir -p $(BIN)
+	@if not exist "$(BIN)" mkdir "$(BIN)"
 	$(CC) $(CFLAGS) $(OBJECTS) -o $@
 
-$(OBJ)/%.o: $(SRC)/%.c
-	@mkdir -p $(OBJ)
+# Regra para compilar arquivos .c em .o
+$(OBJ)\\%.o: %.c
+	@if not exist "$(dir $@)" mkdir "$(dir $@)"
 	$(CC) $(CFLAGS) $(INCLUDES) -c $< -o $@
 
 clean:
-	rm -rf $(OBJ) $(BIN)
+	if exist "$(OBJ)" rmdir /S /Q "$(OBJ)"
+	if exist "$(BIN)" rmdir /S /Q "$(BIN)"
 
 .PHONY: all clean
