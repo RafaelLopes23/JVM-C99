@@ -10,6 +10,7 @@
 #define ARRAY_TYPE_FLOAT  6
 #define ARRAY_TYPE_DOUBLE 7
 
+
 typedef struct {
     uint8_t tag;
     union {
@@ -124,13 +125,29 @@ typedef struct {
 } JVMState;
 
 
+// mb delete down
+typedef struct FieldStatic {
+    int32_t value;
+} FieldStatic;
+
+typedef struct ClassFileElement {
+    char *class_name;
+    ClassFile *class;
+    FieldStatic *static_fields;
+    uint16_t static_fields_count;
+} ClassFileElement;
+
+
+// mb delete up
+
+
 typedef struct {
     JVMStack jvm_stack;
     Heap heap;
     ClassFile class_file; // Add this field to store the parsed class file
+    ClassFileElement *loaded_class; // Simplified loaded class representation
     // Add other JVM state and data structures here
 } JVM;
-
 
 typedef enum {
 
@@ -158,12 +175,13 @@ typedef enum {
     DCONST_0 = 0x0E,
     DCONST_1 = 0x0F,
     
+    
     // Push values
     BIPUSH = 0x10,
     SIPUSH = 0x11,
     
     // Loads
-    ILOAD = 0X15,
+    ILOAD = 0x15,
     // TODO: test
     ILOAD_0 = 0x1A,
     ILOAD_1 = 0x1B,
@@ -204,11 +222,11 @@ typedef enum {
 
     // Stores
     ISTORE = 0x36,
-    // TODO: test
     ISTORE_0 = 0x3B,
     ISTORE_1 = 0x3C,
     ISTORE_2 = 0x3D,
     ISTORE_3 = 0x3E, 
+
 
     LSTORE = 0x37,
     FSTORE = 0x38,
@@ -240,16 +258,25 @@ typedef enum {
     INVOKEDYNAMIC = 0xBA,
 
     
-    INSTANCEOF = 0xBF,
+    INSTANCEOF = 0XBF,
 
-    // branch todo 
-    IFEQ = 0x99,
-    IFNE = 0x9A,  
-    IFLT = 0x9B,  
-    IFGE = 0x9C,
-    IFGT = 0x9D,
-    IFLE = 0x9E,
+    I2F = 0X86,
+    IINC = 0X84,
+    GOTO_W = 0XC8,
+    GOTO = 0XA7,
+    
+    IFEQ = 0X99,
+    IFNE = 0X9A,  
+    IFLT = 0X9B,  
+    IFGE = 0X9C,
+    IFGT = 0X9D,
+    IFLE = 0X9E,
     IF_ICMPEQ = 0x9F,
+    IF_ICMPNE = 0xA0,
+    IF_ICMPLT = 0xA1,
+    IF_ICMPGE = 0xA2,
+    IF_ICMPGT = 0xA3,
+    IF_ICMPLE = 0xA4,
  
     LDC2_W = 0x14,
 
@@ -283,6 +310,8 @@ typedef union {
     int64_t  long_;
     double    double_;
 } Cat2;
+
+
 
 typedef struct {
     int32_t *values;

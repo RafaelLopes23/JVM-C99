@@ -328,46 +328,80 @@ static void handle_dconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
 
 
 static void handle_ldc2_w(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    // TODO 
+    Cat2 cat2;
 
 
-    // uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+    uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
 
-    // if (!validate_constant_pool_index(&jvm->class_file, index)) {
-    //     fprintf(stderr, "ldc2_w: Invalid constant pool index\n");
-    //     return; 
-    // }
+    if (!validate_constant_pool_index(&jvm->class_file, index)) {
+        fprintf(stderr, "ldc2_w: Invalid constant pool index\n");
+        return; 
+    }
 
-    // cp_info *constant_pool_entry = &jvm->class_file.constant_pool[index - 1];
+    cp_info *constant_pool_entry = &jvm->class_file.constant_pool[index - 1];
 
-    // if (constant_pool_entry->tag == CONSTANT_Double) {
-    //     double value = constant_pool_entry->info.Double.bytes;
-    //     Cat2 cat2;
-    //     cat2.double_ = value;
-    //     operand_stack_push_cat2(stack, cat2);
-    // } else if (constant_pool_entry->tag == CONSTANT_Long) {
-    //     int64_t value = constant_pool_entry->info.Long.bytes;
-    //     Cat2 cat2;
-    //     cat2.long_ = value;
-    //     operand_stack_push_cat2(stack, cat2);
-    // } else {
-    //     return; 
-    // }
+    if (constant_pool_entry->tag == CONSTANT_Double) {
+        double value = constant_pool_entry->info.Double.bytes;
+        cat2.double_ = value;
+        operand_stack_push_cat2(stack, cat2);
+    } else if (constant_pool_entry->tag == CONSTANT_Long) {
+        int64_t value = constant_pool_entry->info.Long.bytes;
+        cat2.long_ = value;
+        operand_stack_push_cat2(stack, cat2);
+    } else {
+        return; 
+    }
 
-    // *pc += 3;
+    *pc += 3;
 }
 
 
 
-static void handle_if_icmpeq(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+static void handle_if_icmp(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     int32_t val2, val1;
+    uint8_t opcode = bytecode[*pc];
+    int16_t branch_offset = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+    bool condition = false;
+
     operand_stack_pop(stack, &val2);
     operand_stack_pop(stack, &val1);
-    int16_t branch_offset = (int16_t)((bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2]);
-    if (val1 == val2) {
+
+    switch (opcode) {
+        case IF_ICMPEQ:
+            condition = (val1 == val2);
+            printf("IF_ICMPEQ: %d == %d, ", val1, val2);
+            break;
+        case IF_ICMPNE:
+            condition = (val1 != val2);
+            printf("IF_ICMPNE: %d != %d, ", val1, val2);
+            break;
+        case IF_ICMPLT:
+            condition = (val1 < val2);
+            printf("IF_ICMPLT: %d < %d, ", val1, val2);
+            break;
+        case IF_ICMPGE:
+            condition = (val1 >= val2);
+            printf("IF_ICMPGE: %d >= %d, ", val1, val2);
+            break;
+        case IF_ICMPGT:
+            condition = (val1 > val2);
+            printf("IF_ICMPGT: %d > %d, ", val1, val2);
+            break;
+        case IF_ICMPLE:
+            condition = (val1 <= val2);
+            printf("IF_ICMPLE: %d <= %d, ", val1, val2);
+            break;
+        default:
+            fprintf(stderr, "Error: Unknown if_icmp opcode: 0x%02x\n", opcode);
+            return;
+    }
+
+    if (condition) {
         *pc += branch_offset;
+        printf("branching to offset %d\n", branch_offset);
     } else {
-        *pc += 3;
+        *pc += 3; 
+        printf("if_icmp: false, continuando\n");
     }
 }
 
@@ -377,8 +411,10 @@ static void handle_ifne(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     int16_t branch_offset = (int16_t)((bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2]);
     if (value != 0) {
         *pc += branch_offset;
+        printf("if_icne: verdadeiro, pulando pro offset %d \n", branch_offset);
     } else {
         *pc += 3;
+        printf("if_icne: false, continuando\n");
     }
 }
 
@@ -716,18 +752,261 @@ static void handle_invokevirtual(JVM *jvm, uint8_t *bytecode, uint32_t *pc, Oper
     *pc += 3;
 }
 
+
+static void handle_sipush(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    (*pc)++; // Move past opcode
+    uint8_t byte1 = bytecode[*pc];
+    (*pc)++; // Move past byte1
+    uint8_t byte2 = bytecode[*pc];
+
+    int16_t short_value = (byte1 << 8) | byte2;
+    int32_t int_value = (int32_t)short_value; 
+
+    operand_stack_push(stack, int_value);
+    printf("SIPUSH: Pushed %d\n", int_value);
+    (*pc)++; 
+}
+
+static void handle_ifeq(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    if (value == 0) {
+        int16_t branch_offset = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+        *pc += branch_offset; 
+        printf("IFEQ: verdadeiro %d\n", branch_offset);
+    } else {
+        *pc += 3; 
+        printf("IFEQ: falso, continuando\n");
+    }
+}
+
+static void handle_iflt(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    if (value < 0) {
+        int16_t branch_offset = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+        *pc += branch_offset;
+        printf("IFLT: Value is less than 0, branching to offset %d\n", branch_offset);
+    } else {
+        *pc += 3;
+        printf("IFLT: Value is not less than 0, continuing\n");
+    }
+}
+
+static void handle_ifge(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    if (value >= 0) {
+        int16_t branch_offset = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+        *pc += branch_offset;
+        printf("IFGE: Value is greater than or equal to 0, branching to offset %d\n", branch_offset);
+    } else {
+        *pc += 3;
+        printf("IFGE: Value is less than 0, continuing\n");
+    }
+}
+
+static void handle_ifgt(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    if (value > 0) {
+        int16_t branch_offset = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+        *pc += branch_offset;
+        printf("IFGT: Value is greater than 0, branching to offset %d\n", branch_offset);
+    } else {
+        *pc += 3;
+        printf("IFGT: Value is not greater than 0, continuing\n");
+    }
+}
+
+static void handle_ifle(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    if (value <= 0) {
+        int16_t branch_offset = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
+        *pc += branch_offset;
+        printf("IFLE: Value is less than or equal to 0, branching to offset %d\n", branch_offset);
+    } else {
+        *pc += 3;
+        printf("IFLE: Value is not less than or equal to 0, continuing\n");
+    }
+}
+
+static void handle_i2f(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t int_value;
+    operand_stack_pop(stack, &int_value);
+    float float_value = (float)int_value;
+    operand_stack_push(stack, *(int32_t*)&float_value);
+    (*pc)++;
+}
+
+static void handle_iinc(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    (*pc)++; 
+    uint8_t index = bytecode[*pc];
+    (*pc)++; 
+    int8_t constant = (int8_t)bytecode[*pc];
+    locals[index] += constant;
+    printf("IINC: Increment local variable %d by %d\n", index, constant);
+    (*pc)++;
+}
+
+static void handle_goto_w(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    (*pc)++; 
+    int32_t branch_offset = (bytecode[*pc] << 24) | (bytecode[*pc + 1] << 16) | (bytecode[*pc + 2] << 8) | bytecode[*pc + 3];
+    *pc += branch_offset;
+    printf("GOTO_W: Branching to offset %d\n", branch_offset);
+}
+
+static void handle_goto(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    (*pc)++; 
+    int32_t branch_offset = (bytecode[*pc] << 8) | (bytecode[*pc + 1]);
+    *pc += branch_offset;
+    printf("GOTO_W: Branching to offset %d\n", branch_offset);
+}
+
+static void handle_ldc(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    (*pc)++; 
+    uint8_t index = bytecode[*pc];
+    if (!validate_constant_pool_index(&jvm->class_file, index)) {
+        fprintf(stderr, "LDC: Invalid constant pool index %d\n", index);
+        return;
+    }
+    cp_info *const_pool_entry = &jvm->class_file.constant_pool[index - 1];
+    switch (const_pool_entry->tag) {
+        case CONSTANT_Integer: {
+            int32_t value = const_pool_entry->info.Integer.bytes;
+            operand_stack_push(stack, value);
+            printf("LDC: Pushed integer %d from constant pool index %d\n", value, index);
+            break;
+        }
+        case CONSTANT_Float: {
+            float float_value = const_pool_entry->info.Float.bytes;
+            operand_stack_push(stack, *(int32_t*)&float_value); // Push float as int bits
+            printf("LDC: Pushed float %f from constant pool index %d\n", float_value, index);
+            break;
+        }
+        // Add cases for STRING, CLASS, etc. if needed
+        default:
+            fprintf(stderr, "LDC: Constant pool entry type %d not yet implemented\n", const_pool_entry->tag);
+            break;
+    }
+    (*pc)++;
+}
+
+
+// static void handle_getstatic(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+
+//     uint16_t index = (bytecode[*pc + 1] << 8) | bytecode[*pc + 2]; // Read indexbyte1 and indexbyte2
+
+//     if (!validate_constant_pool_index(&jvm->class_file, index)) {
+//         fprintf(stderr, "GETSTATIC: Invalid constant pool index %d\n", index);
+//         return;
+//     }
+
+//     cp_info *const_pool_entry = &jvm->class_file.constant_pool[index - 1];
+//     if (const_pool_entry->tag != CONSTANT_Fieldref) {
+//         fprintf(stderr, "GETSTATIC: Constant pool entry at index %d is not a Fieldref\n", index);
+//         return;
+//     }
+
+//     // In a real JVM, field resolution and loading would happen here.
+//     // For this simplified example, we'll just push a placeholder value (0) onto the stack
+//     // and print a message indicating the field we would be accessing.
+
+//     uint16_t class_index = const_pool_entry->info.Fieldref.class_index;
+//     uint16_t name_and_type_index = const_pool_entry->info.Fieldref.name_and_type_index;
+
+//     const char* class_name = get_constant_pool_string(&jvm->class_file, jvm->class_file.constant_pool[class_index - 1].info.Class.name_index);
+//     const char* name_and_type = get_constant_pool_string(&jvm->class_file, name_and_type_index);
+
+
+//     operand_stack_push(stack, 0); // Placeholder value
+//     printf("GETSTATIC: Pushed placeholder for static field %s.%s onto stack\n", class_name, name_and_type);
+//     (*pc) += 3;
+// }
+
+
+
+static void handle_getstatic(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    (*pc)++;
+    uint16_t index = (bytecode[*pc] << 8) | bytecode[*pc + 1];
+    (*pc) += 2;
+
+    if (!validate_constant_pool_index(&jvm->class_file, index)) {
+        fprintf(stderr, "GETSTATIC: Invalid constant pool index %d\n", index);
+        return;
+    }
+
+    cp_info *const_pool_entry = &jvm->class_file.constant_pool[index - 1];
+    if (const_pool_entry->tag != CONSTANT_Fieldref) {
+        fprintf(stderr, "GETSTATIC: Constant pool entry at index %d is not a Fieldref\n", index);
+        return;
+    }
+
+    uint16_t class_index = const_pool_entry->info.Fieldref.class_index;
+    uint16_t name_and_type_index = const_pool_entry->info.Fieldref.name_and_type_index;
+
+    const char* class_name = get_constant_pool_string(&jvm->class_file, jvm->class_file.constant_pool[class_index - 1].info.Class.name_index);
+    const char* field_name = get_constant_pool_string(&jvm->class_file, jvm->class_file.constant_pool[name_and_type_index - 1].info.NameAndType.name_index);
+
+    if (!jvm->loaded_class || strcmp(jvm->loaded_class->class_name, class_name) != 0) {
+        fprintf(stderr, "GETSTATIC: Class %s not loaded\n", class_name);
+        return;
+    }
+
+    ClassFileElement *loaded_class = jvm->loaded_class;
+    FieldStatic *static_field = NULL;
+
+    for (int i = 0; i < loaded_class->static_fields_count; ++i) {
+        const char* current_field_name = get_constant_pool_string(&jvm->class_file, loaded_class->class->fields[i].name_index);
+        if (strcmp(current_field_name, field_name) == 0) {
+            static_field = &loaded_class->static_fields[i];
+            break;
+        }
+    }
+
+    if (!static_field) {
+        fprintf(stderr, "GETSTATIC: Static field %s.%s not found or not static\n", class_name, field_name);
+        return;
+    }
+
+    operand_stack_push(stack, static_field->value);
+    printf("GETSTATIC: Pushed static field %s.%s value: %d onto stack\n", class_name, field_name, static_field->value);
+}
+
 // ... more handler functions for each instruction
 
 static instruction_handler instruction_table[256] = {0};  // Initialize all to NULL
 
 static void init_instruction_table(void) {
+    
+    instruction_table[GETSTATIC] = handle_getstatic;
 
     instruction_table[INVOKEVIRTUAL] = handle_invokevirtual;
     instruction_table[LNEG] = handle_lneg;
     instruction_table[DSTORE] = handle_dstore;
     instruction_table[RETURN] = handle_return;
+    
+
+    instruction_table[I2F] = handle_i2f;
+    instruction_table[IINC] = handle_iinc;
+    instruction_table[GOTO_W] = handle_goto_w;
+    instruction_table[GOTO] = handle_goto;
+    instruction_table[LDC] = handle_ldc;
+
+    instruction_table[SIPUSH] = handle_sipush;
+    instruction_table[IFEQ] = handle_ifeq;
+    instruction_table[IFLT] = handle_iflt;
+    instruction_table[IFGE] = handle_ifge;
+    instruction_table[IFGT] = handle_ifgt;
+    instruction_table[IFLE] = handle_ifle;
     instruction_table[IFNE] = handle_ifne;
-    instruction_table[IF_ICMPEQ] = handle_if_icmpeq;
+    instruction_table[IF_ICMPEQ] = handle_if_icmp;
+    instruction_table[IF_ICMPNE] = handle_if_icmp;
+    instruction_table[IF_ICMPLT] = handle_if_icmp;
+    instruction_table[IF_ICMPGE] = handle_if_icmp;
+    instruction_table[IF_ICMPGT] = handle_if_icmp;
+    instruction_table[IF_ICMPLE] = handle_if_icmp;
 
     instruction_table[NOP] = handle_nop;
     instruction_table[ICONST_M1] = handle_iconst;
@@ -742,6 +1021,7 @@ static void init_instruction_table(void) {
     instruction_table[IMUL] = handle_imul;
     instruction_table[IDIV] = handle_idiv;
     instruction_table[IOR] = handle_ior;
+    // todo iload 
     instruction_table[ILOAD_0] = handle_iload_n;
     instruction_table[ILOAD_1] = handle_iload_n;
     instruction_table[ILOAD_2] = handle_iload_n;
@@ -776,8 +1056,8 @@ static void init_instruction_table(void) {
     instruction_table[LMUL] = handle_lmul;
     instruction_table[LDIV] = handle_ldiv;
     instruction_table[LREM] = handle_lrem;
-// TODO
-    // instruction_table[LDC2_W] = handle_ldc2_w;
+
+    instruction_table[LDC2_W] = handle_ldc2_w;
     
     instruction_table[DCONST_0] = handle_dconst;
     instruction_table[DCONST_1] = handle_dconst;
