@@ -174,8 +174,13 @@ static void handle_dload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack
 
 static void handle_istore_n(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     uint8_t opcode = bytecode[*pc];
-    int32_t index = opcode - ISTORE_0;
-    int32_t value;
+    int32_t index, value;
+
+    if(opcode == ISTORE)
+        index = bytecode[(*pc) + 1];
+    else
+        index = opcode - ISTORE_0;
+
     operand_stack_pop(stack, &value);
     locals[index] = value;
     printf("ISTORE_%d: Stored %d\n", index, value);
@@ -185,7 +190,13 @@ static void handle_istore_n(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSt
 
 static void handle_iload_n(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     uint8_t opcode = bytecode[*pc];
-    int32_t index = opcode - ILOAD_0;
+    int32_t index;
+
+    if(opcode == ILOAD)
+        index = bytecode[(*pc) + 1];
+    else
+        index = opcode - ILOAD_0;
+
     operand_stack_push(stack, locals[index]);
     printf("ILOAD_%d: Loaded %d\n", index, locals[index]);
     (*pc)++;
@@ -1006,9 +1017,7 @@ static instruction_handler instruction_table[256] = {0};  // Initialize all to N
 static void init_instruction_table(void) {
     
     instruction_table[GETSTATIC] = handle_getstatic;
-
     instruction_table[INVOKEVIRTUAL] = handle_invokevirtual;
-    instruction_table[LNEG] = handle_lneg;
     instruction_table[DSTORE] = handle_dstore;
     instruction_table[RETURN] = handle_return;
     
@@ -1046,11 +1055,12 @@ static void init_instruction_table(void) {
     instruction_table[IMUL] = handle_imul;
     instruction_table[IDIV] = handle_idiv;
     instruction_table[IOR] = handle_ior;
-    // todo iload 
+    instruction_table[ILOAD] = handle_iload_n;
     instruction_table[ILOAD_0] = handle_iload_n;
     instruction_table[ILOAD_1] = handle_iload_n;
     instruction_table[ILOAD_2] = handle_iload_n;
     instruction_table[ILOAD_3] = handle_iload_n;
+    instruction_table[ISTORE] = handle_istore_n;
     instruction_table[ISTORE_0] = handle_istore_n;
     instruction_table[ISTORE_1] = handle_istore_n;
     instruction_table[ISTORE_2] = handle_istore_n;
@@ -1059,6 +1069,7 @@ static void init_instruction_table(void) {
     instruction_table[POP] = handle_pop;
 
     instruction_table[FLOAD] = handle_fload;
+    instruction_table[FLOAD_0] = handle_fload;
     instruction_table[FLOAD_1] = handle_fload;
     instruction_table[FLOAD_2] = handle_fload;
     instruction_table[FLOAD_3] = handle_fload;
@@ -1084,6 +1095,7 @@ static void init_instruction_table(void) {
     instruction_table[LMUL] = handle_lmul;
     instruction_table[LDIV] = handle_ldiv;
     instruction_table[LREM] = handle_lrem;
+    instruction_table[LNEG] = handle_lneg;
 
     instruction_table[LDC2_W] = handle_ldc2_w;
     
@@ -1232,10 +1244,9 @@ void operand_stack_push_cat2(OperandStack *stack, Cat2 value) {
         fprintf(stderr, "Stack overflow in push_cat2\n");
         return;
     }
-    // Push high bits first, then low bits
     stack->values[stack->size++] = value.high;
     stack->values[stack->size++] = value.low;
-    printf("Push Cat2: high=%u, low=%u\n", value.high, value.low);
+    // printf("Push Cat2: high=%u, low=%u\n", value.high, value.low);
 }
 
 bool operand_stack_pop(OperandStack *stack, int32_t *value) {
@@ -1253,10 +1264,9 @@ Cat2 operand_stack_pop_cat2(OperandStack *stack) {
         value.bytes = 0;
         return value;
     }
-    // Pop in reverse order: low bits then high bits
     value.low = stack->values[--stack->size];
     value.high = stack->values[--stack->size];
-    printf("Pop Cat2: high=%u, low=%u\n", value.high, value.low);
+    // printf("Pop Cat2: high=%u, low=%u\n", value.high, value.low);
     return value;
 }
 
@@ -1367,6 +1377,7 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length, int
     while (pc < bytecode_length) {
         uint8_t opcode = bytecode[pc];
         instruction_handler handler = instruction_table[opcode];
+        // fprintf(stderr, ">0x%02x at pc=%u\n", opcode, pc);
         
         if (handler) {
             handler(jvm, bytecode, &pc, &operand_stack, locals);
