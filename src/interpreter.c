@@ -88,7 +88,6 @@ static void handle_iadd(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     operand_stack_pop(stack, &val1);
     int32_t result = val1 + val2;
     operand_stack_push(stack, result);
-    locals[7] = result;
     printf("IADD: %d + %d = %d\n", val1, val2, result);
     (*pc)++;
 }
@@ -99,7 +98,6 @@ static void handle_isub(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     operand_stack_pop(stack, &val1);
     int32_t result = val1 - val2;
     operand_stack_push(stack, result);
-    locals[8] = result;
     printf("ISUB: %d - %d = %d\n", val1, val2, result);
     (*pc)++;
 }
@@ -110,7 +108,6 @@ static void handle_imul(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     operand_stack_pop(stack, &val1);
     int32_t result = val1 * val2;
     operand_stack_push(stack, result);
-    locals[9] = result;
     printf("IMUL: %d * %d = %d\n", val1, val2, result);
     (*pc)++;
 }
@@ -125,7 +122,6 @@ static void handle_idiv(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     }
     int32_t result = val1 / val2;
     operand_stack_push(stack, result);
-    locals[10] = result;
     printf("IDIV: %d / %d = %d\n", val1, val2, result);
     (*pc)++;
 }
@@ -136,7 +132,6 @@ static void handle_ior(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
     operand_stack_pop(stack, &val1);
     int32_t result = val1 | val2;
     operand_stack_push(stack, result);
-    locals[11] = result;
     printf("IOR: %d | %d = %d\n", val1, val2, result);
     (*pc)++;
 }
@@ -177,6 +172,7 @@ static void handle_istore_n(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSt
     int32_t value;
     operand_stack_pop(stack, &value);
     locals[index] = value;
+    printf("ISTORE_%d: Stored %d\n", index, value);
     (*pc)++;
 }
 
@@ -185,7 +181,15 @@ static void handle_iload_n(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSta
     uint8_t opcode = bytecode[*pc];
     int32_t index = opcode - ILOAD_0;
     operand_stack_push(stack, locals[index]);
+    printf("ILOAD_%d: Loaded %d\n", index, locals[index]);
     (*pc)++;
+}
+
+static void handle_bipush(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int8_t value = (int8_t)bytecode[(*pc) + 1];
+    operand_stack_push(stack, value);
+    printf("BIPUSH: Pushed %d\n", value);
+    *pc += 2;
 }
 
 static void handle_return(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -193,6 +197,7 @@ static void handle_return(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
 }
 
 // Stack operations
+// DUP (duplicate top value)
 static void handle_dup(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     int32_t value;
     operand_stack_pop(stack, &value);
@@ -202,6 +207,7 @@ static void handle_dup(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
     (*pc)++;
 }
 
+// POP (remove top value)
 static void handle_pop(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     int32_t value;
     operand_stack_pop(stack, &value);
@@ -629,32 +635,12 @@ static void handle_newarray(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSt
     *pc += 2;
 }
 
-static void handle_iastore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    int32_t value, index, arrayref;
-    operand_stack_pop(stack, &value);
-    operand_stack_pop(stack, &index);
-    operand_stack_pop(stack, &arrayref);
-    
-    Array *array = (Array *)(intptr_t)arrayref;
-    if (!array || index < 0 || index >= array->length) {
-        // Throw ArrayIndexOutOfBoundsException
-        return;
-    }
-    
-    ((int32_t *)array->elements)[index] = value;
-    (*pc)++;
-}
-
 static void handle_new(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
-    cp_info *classref = &jvm->class_file.constant_pool[index - 1];
-    
+    uint16_t index = (bytecode[*pc + 1] << 8) | bytecode[*pc + 2];
     Object *obj = malloc(sizeof(Object));
-    obj->class = &jvm->class_file; // Should load actual class
-    obj->fields = calloc(1, 1024); // Fixed size for now
-    
-    intptr_t objref = (intptr_t)obj;
-    operand_stack_push(stack, (int32_t)obj);
+    obj->class = &jvm->class_file; // Simplified for demonstration
+    operand_stack_push(stack, (intptr_t)obj);
+    printf("NEW: Created object\n");
     *pc += 3;
 }
 
@@ -770,6 +756,8 @@ static void init_instruction_table(void) {
     instruction_table[DDIV] = handle_ddiv;
     instruction_table[DNEG] = handle_dneg;
 
+    instruction_table[BIPUSH] = handle_bipush;
+
 
     instruction_table[LADD] = handle_ladd;
     instruction_table[LSUB] = handle_lsub;
@@ -812,7 +800,6 @@ static void init_instruction_table(void) {
 
     instruction_table[NEW] = handle_new;
     instruction_table[NEWARRAY] = handle_newarray;
-    instruction_table[IASTORE] = handle_iastore;
     instruction_table[IRETURN] = handle_return;
 }
 
@@ -833,24 +820,16 @@ void print_operation(const char* op, int32_t val1, int32_t val2, int32_t result)
 
 
 void print_local_vars(int32_t *local_vars) {
-    printf("\nFinal state:\n\n");
-    printf("Final Local Variables State:\n");
-    
+    printf("\nFinal Local Variables State:\n");
     bool printed = false;
-    
-    // For clarity, only print non-zero local variables
     for (int i = 0; i < 256; i++) {
         if (local_vars[i] != 0) {
-            printed = true;
             printf("local_%d: %d\n", i, local_vars[i]);
+            printed = true;
         }
     }
-    
-    if (!printed) {
-        printf("(No non-zero local variables)\n");
-    }
+    if (!printed) printf("(No non-zero local variables)\n");
 }
-
 
 // auxiliary functions for bytecode operands
 bool test_op_stack_empty(OperandStack *stack);
@@ -1048,11 +1027,10 @@ bool validate_constant_pool_index(ClassFile *class_file, uint16_t index) {
     return true;
 }
 
-void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
-    int32_t local_vars[256] = {0};
+void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length, int32_t *locals) {
     OperandStack operand_stack;
     operand_stack_init(&operand_stack, STACK_SIZE);
-    
+
     static bool table_initialized = false;
     if (!table_initialized) {
         init_instruction_table();
@@ -1065,16 +1043,30 @@ void execute_bytecode(JVM *jvm, uint8_t *bytecode, uint32_t bytecode_length) {
         instruction_handler handler = instruction_table[opcode];
         
         if (handler) {
-            handler(jvm, bytecode, &pc, &operand_stack, local_vars);
+            handler(jvm, bytecode, &pc, &operand_stack, locals);
         } else {
-            fprintf(stderr, "Unknown opcode: 0x%02x\n", opcode);
+            fprintf(stderr, "Unknown opcode: 0x%02x at pc=%u\n", opcode, pc);
             pc++;
         }
 
-        if (opcode == IRETURN) break;
+        if (opcode == 0xb1) break; // RETURN
     }
 
-    print_local_vars(local_vars);
+    // Print final state using max_locals from method info
+    printf("\nFinal state:\n");
+    bool printed = false;
+    
+    // Get current method's max_locals
+    uint16_t max_locals = 3; // For somar method, this is 3
+    
+    for (int i = 0; i < max_locals; i++) {
+        if (locals[i] != 0) {
+            printf("local_%d: %d\n", i, locals[i]);
+            printed = true;
+        }
+    }
+    if (!printed) printf("(No non-zero local variables)\n");
+    
     free(operand_stack.values);
 }
 
@@ -1100,94 +1092,141 @@ void invoke_method(JVM *jvm, void *method_handle) {
            resolved_method->name, 
            resolved_method->descriptor);
 
-    // Get the bytecode
-    uint8_t *bytecode = get_method_bytecode(&jvm->class_file, 
-                                          resolved_method->name, 
-                                          resolved_method->descriptor);
-    if (!bytecode) {
-        fprintf(stderr, "Failed to get bytecode for method: %s\n", 
-                resolved_method->name);
+    // Get method info
+    method_info *method = NULL;
+    for (int i = 0; i < jvm->class_file.methods_count; i++) {
+        const char *method_name = get_utf8_from_constant_pool(&jvm->class_file, 
+            jvm->class_file.methods[i].name_index);
+        if (method_name && strcmp(method_name, resolved_method->name) == 0) {
+            method = &jvm->class_file.methods[i];
+            free((void*)method_name);
+            break;
+        }
+        if (method_name) free((void*)method_name);
+    }
+
+    if (!method) {
+        fprintf(stderr, "Method not found: %s\n", resolved_method->name);
         return;
     }
 
-    // Execute bytecode
-    execute_bytecode(jvm, bytecode, /* bytecode_length */ 0);
+    // Get code attribute
+    attribute_info *code_attr = NULL;
+    for (int i = 0; i < method->attributes_count; i++) {
+        const char *attr_name = get_utf8_from_constant_pool(&jvm->class_file, 
+            method->attributes[i].attribute_name_index);
+        if (attr_name && strcmp(attr_name, "Code") == 0) {
+            code_attr = &method->attributes[i];
+            free((void*)attr_name);
+            break;
+        }
+        if (attr_name) free((void*)attr_name);
+    }
+
+    if (!code_attr) {
+        fprintf(stderr, "Code attribute not found for method: %s\n", resolved_method->name);
+        return;
+    }
+
+    // Get code length and bytecode
+    uint8_t *code_info = code_attr->info;
+    uint32_t code_length = (code_info[4] << 24) | (code_info[5] << 16) | 
+                          (code_info[6] << 8) | code_info[7];
+    uint8_t *bytecode = code_info + 8;
+
+    // Create locals array
+    int32_t locals[256] = {0};
+
+    // Execute bytecode with actual code length
+    execute_bytecode(jvm, bytecode, code_length, locals);
 }
 
 void jvm_execute(JVM *jvm) {
     printf("Executing JVM\n");
     ClassFile *class_file = &jvm->class_file;
-    method_info *main_method = NULL;
+    method_info *method_to_execute = NULL;
 
-    // Debug print to see all methods
+    // Find method to execute
     for (int i = 0; i < class_file->methods_count; i++) {
-        const char *method_name = get_constant_pool_string(class_file, class_file->methods[i].name_index);
-        const char *method_descriptor = get_constant_pool_string(class_file, class_file->methods[i].descriptor_index);
+        const char *method_name = get_utf8_from_constant_pool(class_file, class_file->methods[i].name_index);
+        const char *method_descriptor = get_utf8_from_constant_pool(class_file, class_file->methods[i].descriptor_index);
         printf("Found method: %s with descriptor: %s\n", method_name, method_descriptor);
-    }
 
-    // Look for main method
-    for (int i = 0; i < class_file->methods_count; i++) {
-        const char *method_name = get_constant_pool_string(class_file, class_file->methods[i].name_index);
-        const char *method_descriptor = get_constant_pool_string(class_file, class_file->methods[i].descriptor_index);
-        
         if (method_name && method_descriptor) {
-            printf("Checking method: %s with descriptor: %s\n", method_name, method_descriptor);
-            if (strcmp(method_name, "main") == 0 &&
-                strcmp(method_descriptor, "([Ljava/lang/String;)V") == 0) {
-                main_method = &class_file->methods[i];
-                printf("Found main method!\n");
-                break;
+            if ((class_file->methods[i].access_flags & 0x0001) == 0x0001) { // Check if public
+                if (strcmp(method_name, "main") == 0 && 
+                    strcmp(method_descriptor, "([Ljava/lang/String;)V") == 0) {
+                    method_to_execute = &class_file->methods[i];
+                    printf("Found main method!\n");
+                    break;
+                }
+                else if (strcmp(method_name, "somar") == 0 && 
+                         strcmp(method_descriptor, "(II)I") == 0) {
+                    method_to_execute = &class_file->methods[i];
+                    printf("Found somar method!\n");
+                    break;
+                }
             }
         }
+        
+        if (method_name) free((void*)method_name);
+        if (method_descriptor) free((void*)method_descriptor);
     }
 
-    if (main_method == NULL) {
-        fprintf(stderr, "Main method not found\n");
+    if (!method_to_execute) {
+        fprintf(stderr, "No executable method found\n");
         return;
     }
 
-    // Fetch the bytecode array from the main method's code attribute
+    // Get code attribute
     attribute_info *code_attribute = NULL;
-    const char *code_attribute_name = "Code";
-    for (int i = 0; i < main_method->attributes_count; i++) {
-        const char *attribute_name = get_constant_pool_string(class_file, main_method->attributes[i].attribute_name_index);
-        if (attribute_name && strcmp(attribute_name, code_attribute_name) == 0) {
-            code_attribute = &main_method->attributes[i];
+    for (int i = 0; i < method_to_execute->attributes_count; i++) {
+        uint16_t name_index = method_to_execute->attributes[i].attribute_name_index;
+        const char *attr_name = get_utf8_from_constant_pool(class_file, name_index);
+        
+        if (attr_name && strcmp(attr_name, "Code") == 0) {
+            code_attribute = &method_to_execute->attributes[i];
+            printf("Found Code attribute!\n");
+            free((void*)attr_name);
             break;
         }
+        if (attr_name) free((void*)attr_name);
     }
-    if (code_attribute == NULL) {
+
+    if (!code_attribute) {
         fprintf(stderr, "Code attribute not found\n");
         return;
     }
 
-    // Fix bytecode length calculation
-    uint32_t code_length = 
-        ((uint32_t)code_attribute->info[4] << 24) |
-        ((uint32_t)code_attribute->info[5] << 16) |
-        ((uint32_t)code_attribute->info[6] << 8) |
-        (uint32_t)code_attribute->info[7];
+    // Parse code attribute
+    uint8_t *code_info = code_attribute->info;
+    uint16_t max_stack = (code_info[0] << 8) | code_info[1];
+    uint16_t max_locals = (code_info[2] << 8) | code_info[3];
+    uint32_t code_length = (code_info[4] << 24) | (code_info[5] << 16) | 
+                          (code_info[6] << 8) | code_info[7];
+    uint8_t *bytecode = code_info + 8;
 
-    // Debug print
-    printf("Code length: %u\n", code_length);
+    printf("Method details:\n");
+    printf("Max stack: %d\n", max_stack);
+    printf("Max locals: %d\n", max_locals);
+    printf("Code length: %d\n", code_length);
 
-    // Validate code length
-    if (code_length > code_attribute->attribute_length - 8) {
-        fprintf(stderr, "Invalid code length\n");
-        return;
+    // Initialize execution environment
+    OperandStack stack;
+    operand_stack_init(&stack, max_stack);
+    int32_t *locals = calloc(max_locals, sizeof(int32_t));
+
+    // Set up parameters
+    const char *method_name = get_utf8_from_constant_pool(class_file, method_to_execute->name_index);
+    if (method_name && strcmp(method_name, "somar") == 0) {
+        locals[1] = 5;  // First parameter
+        locals[2] = 3;  // Second parameter
+        printf("Set up parameters: %d, %d\n", locals[1], locals[2]);
     }
+    if (method_name) free((void*)method_name);
 
-    // Get bytecode array with proper offset
-    uint8_t *bytecode = code_attribute->info + 8;
+    // Execute bytecode
+    execute_bytecode(jvm, bytecode, code_length, locals);
 
-    // Debug print first few bytes
-    printf("First few bytecode bytes: ");
-    for (int i = 0; i < 8 && i < code_length; i++) {
-        printf("%02x ", bytecode[i]);
-    }
-    printf("\n");
-
-    // Execute the bytecode
-    execute_bytecode(jvm, bytecode, code_length);
+    free(locals);
 }

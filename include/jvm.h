@@ -258,6 +258,8 @@ typedef enum {
     DDIV = 0x6F,
     DNEG = 0x77,
 
+    ASTORE = 0x3A,
+
     DCMPL = 0X97,
     DCMPG = 0X98,
     D2F = 0X90,
@@ -285,8 +287,8 @@ typedef union {
 } Cat2;
 
 typedef struct {
-    int32_t *values;
-    int size;
+    uint32_t *values;  // Changed to uint32_t
+    int size;          // Number of slots (32 bits)
     int capacity;
 } OperandStack;
 
@@ -300,6 +302,7 @@ Cat2 operand_stack_pop_cat2(OperandStack *stack);
 void operand_stack_init(OperandStack *stack, int capacity);
 bool validate_constant_pool_index(ClassFile *class_file, uint16_t index);
 void print_stack_state(OperandStack *stack);
+void print_local_vars(int32_t *local_vars);
 
 typedef void (*instruction_handler)(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals);
 
