@@ -564,14 +564,88 @@ void read_minor_major(const char *filename) {
     FILE *file = abre_arquivo(filename);
     uint16_t major_version, minor_version;
 
-    read_bytes(file, &minor_version, sizeof(minor_version), 4);
-    read_bytes(file, &major_version, sizeof(major_version), 6);
+    // Lê os bytes para as variáveis
+    read_bytes(file, &minor_version, sizeof(minor_version), 4); // Lê o minor_version na posição 4
+    read_bytes(file, &major_version, sizeof(major_version), 6); // Lê o major_version na posição 6
 
+    // Converte para big endian
     minor_version = to_big_endian_16(minor_version);
     major_version = to_big_endian_16(major_version);
 
-    printf("Minor version: %u\n", minor_version);
-    printf("Major version: %u\n", major_version);
+    // Imprime a versão JDK com base no major_version
+    printf("Versao JDK: ");
+    
+    switch (major_version) {
+        case 45:
+            printf("JDK 1.1");
+            break;
+        case 46:
+            printf("JDK 1.2");
+            break;
+        case 47:
+            printf("JDK 1.3");
+            break;
+        case 48:
+            printf("JDK 1.4");
+            break;
+        case 49:
+            printf("JDK 5");
+            break;
+        case 50:
+            printf("JDK 6");
+            break;
+        case 51:
+            printf("JDK 7");
+            break;
+        case 52:
+            printf("JDK 8");
+            break;
+        case 53:
+            printf("JDK 9");
+            break;
+        case 54:
+            printf("JDK 10");
+            break;
+        case 55:
+            printf("JDK 11");
+            break;
+        case 56:
+            printf("JDK 12");
+            break;
+        case 57:
+            printf("JDK 13");
+            break;
+        case 58:
+            printf("JDK 14");
+            break;
+        case 59:
+            printf("JDK 15");
+            break;
+        case 60:
+            printf("JDK 16");
+            break;
+        case 61:
+            printf("JDK 17");
+            break;
+        case 62:
+            printf("JDK 18");
+            break;
+        case 63:
+            printf("JDK 19");
+            break;
+        case 64:
+            printf("JDK 20");
+            break;
+        case 65:
+            printf("JDK 21");
+            break;
+        default:
+            printf("Versao desconhecida");
+            break;
+    }
+
+    // Imprime o número major e minor
+    printf(" (Major: %u, Minor: %u)\n", major_version, minor_version);
 
     fclose(file);
 }
