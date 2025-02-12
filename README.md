@@ -52,7 +52,12 @@ javac Test.java
 
 Execute a JVM com o arquivo compilado
 ```
-./bin/jvm Test.class
+./bin/jvm Test.class --jvm
+```
+
+Execute o Leitor com o arquivo compilado
+```
+./bin/jvm Test.class --leitor
 ```
 
 ### Estrutura do Projeto
