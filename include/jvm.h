@@ -303,14 +303,15 @@ typedef enum {
 
 // unions for bytecode operands
 typedef union {
-    struct{
+    struct {
         uint32_t low;
         uint32_t high;
     };
-	int32_t int_;
-    uint64_t    bytes_;
-    int64_t  long_;
-    double    double_;
+    int32_t int_;
+    uint64_t bytes;
+    int64_t long_;
+    double double_;
+    float float_;
 } Cat2;
 
 
@@ -326,7 +327,7 @@ void jvm_load_class(JVM *jvm, const char *class_file);
 void jvm_execute(JVM *jvm);
 bool operand_stack_push(OperandStack *stack, int32_t value);
 bool operand_stack_pop(OperandStack *stack, int32_t *value);
-void operand_stack_push_cat2(OperandStack *stack, Cat2 val);
+void operand_stack_push_cat2(OperandStack *stack, Cat2 value);
 Cat2 operand_stack_pop_cat2(OperandStack *stack);
 void operand_stack_init(OperandStack *stack, int capacity);
 bool validate_constant_pool_index(ClassFile *class_file, uint16_t index);

@@ -153,16 +153,22 @@ static void handle_fload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack
 // Load/Store operations
 static void handle_dload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     uint8_t opcode = bytecode[*pc];
-    uint8_t index ;
-    if(opcode == DLOAD)
+    uint8_t index;
+    
+    if (opcode == DLOAD) {
         index = bytecode[(*pc) + 1];
-    else
+        (*pc) += 2;
+    } else {
         index = opcode - DLOAD_0;
+        (*pc)++;
+    }
+    
     Cat2 value;
-    value.low = locals[index];
-    value.high = locals[index + 1];
+    value.high = locals[index];
+    value.low = locals[index + 1];
     operand_stack_push_cat2(stack, value);
-    *pc += 2;
+    printf("DLOAD_%d: Loaded double from locals[%d,%d]\n", 
+           index, index, index + 1);
 }
 
 
@@ -217,11 +223,15 @@ static void handle_pop(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
 
 // 64-bit operations (category 2)
 static void handle_dadd(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    CHECK_STACK(stack, 4);  // Need 4 slots for 2 doubles
+    
     Cat2 val2 = operand_stack_pop_cat2(stack);
     Cat2 val1 = operand_stack_pop_cat2(stack);
+    
     Cat2 result;
     result.double_ = val1.double_ + val2.double_;
     operand_stack_push_cat2(stack, result);
+    
     printf("DADD: %f + %f = %f\n", val1.double_, val2.double_, result.double_);
     (*pc)++;
 }
@@ -334,31 +344,35 @@ static void handle_dconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
 
 
 static void handle_ldc2_w(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    Cat2 cat2;
-
-
     uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
-
+    
     if (!validate_constant_pool_index(&jvm->class_file, index)) {
-        fprintf(stderr, "ldc2_w: Invalid constant pool index\n");
-        return; 
+        fprintf(stderr, "LDC2_W: Invalid constant pool index\n");
+        return;
     }
 
-    cp_info *constant_pool_entry = &jvm->class_file.constant_pool[index - 1];
+    cp_info *constant = &jvm->class_file.constant_pool[index - 1];
+    Cat2 value;
 
-    if (constant_pool_entry->tag == CONSTANT_Double) {
-        double value = constant_pool_entry->info.Double.bytes;
-        cat2.double_ = value;
-        operand_stack_push_cat2(stack, cat2);
-    } else if (constant_pool_entry->tag == CONSTANT_Long) {
-        int64_t value = constant_pool_entry->info.Long.bytes;
-        cat2.long_ = value;
-        operand_stack_push_cat2(stack, cat2);
-    } else {
-        return; 
+    switch (constant->tag) {
+        case CONSTANT_Double:
+            value.bytes = constant->info.Double.bytes;
+            operand_stack_push_cat2(stack, value);
+            printf("LDC2_W: Loaded double %f\n", value.double_);
+            break;
+            
+        case CONSTANT_Long:
+            value.bytes = constant->info.Long.bytes;
+            operand_stack_push_cat2(stack, value);
+            printf("LDC2_W: Loaded long %ld\n", value.long_);
+            break;
+            
+        default:
+            fprintf(stderr, "LDC2_W: Invalid constant type %d\n", constant->tag);
+            return;
     }
 
-    *pc += 3;
+    (*pc) += 3;
 }
 
 
@@ -454,13 +468,22 @@ static void handle_land(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
 
 
 static void handle_dstore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    uint8_t index = bytecode[(*pc) + 1];
-    int32_t value;
-    operand_stack_pop(stack, &value);
-    locals[index] = value;
-    operand_stack_pop(stack, &value);
-    locals[index] = value;
-    *pc += 2;
+    uint8_t opcode = bytecode[*pc];
+    uint8_t index;
+    
+    if (opcode == DSTORE) {
+        index = bytecode[(*pc) + 1];
+        (*pc) += 2;
+    } else {
+        index = opcode - DSTORE_0;
+        (*pc)++;
+    }
+    
+    Cat2 value = operand_stack_pop_cat2(stack);
+    locals[index] = value.high;
+    locals[index + 1] = value.low;
+    printf("DSTORE_%d: Stored double to locals[%d,%d]\n", 
+           index, index, index + 1);
 }
 
 static void handle_dstore_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -507,11 +530,15 @@ static void handle_lastore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSta
 
 
 static void handle_dsub(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    CHECK_STACK(stack, 4);
+    
     Cat2 val2 = operand_stack_pop_cat2(stack);
     Cat2 val1 = operand_stack_pop_cat2(stack);
+    
     Cat2 result;
     result.double_ = val1.double_ - val2.double_;
     operand_stack_push_cat2(stack, result);
+    
     printf("DSUB: %f - %f = %f\n", val1.double_, val2.double_, result.double_);
     (*pc)++;
 }
@@ -716,21 +743,31 @@ static void handle_invokevirtual(JVM *jvm, uint8_t *bytecode, uint32_t *pc, Oper
 
     cp_info *methodref = &jvm->class_file.constant_pool[index - 1];
     if (methodref->tag == CONSTANT_Methodref) {
-        (void)methodref->info.Methodref.class_index; // Silence warning
-        uint16_t class_index = methodref->info.Methodref.class_index;
         uint16_t name_and_type_index = methodref->info.Methodref.name_and_type_index;
         
         cp_info *name_and_type = &jvm->class_file.constant_pool[name_and_type_index - 1];
         uint16_t name_index = name_and_type->info.NameAndType.name_index;
+        uint16_t descriptor_index = name_and_type->info.NameAndType.descriptor_index;
         
         const char *method_name = get_constant_pool_string(&jvm->class_file, name_index);
+        const char *descriptor = get_constant_pool_string(&jvm->class_file, descriptor_index);
         
         if (method_name && strcmp(method_name, "println") == 0) {
-            int32_t value;
-            if (operand_stack_pop(stack, &value)) {
+            if (descriptor && strcmp(descriptor, "(D)V") == 0) {
+                // Handle double parameter
+                Cat2 value = operand_stack_pop_cat2(stack);
                 int32_t dummy;
-                operand_stack_pop(stack, &dummy);
+                operand_stack_pop(stack, &dummy); // Pop objectref (System.out)
+                printf("%f\n", value.double_);
+            } else if (descriptor && strcmp(descriptor, "(I)V") == 0) {
+                // Handle integer parameter
+                int32_t value;
+                operand_stack_pop(stack, &value);
+                int32_t dummy;
+                operand_stack_pop(stack, &dummy); // Pop objectref
                 printf("%d\n", value);
+            } else {
+                fprintf(stderr, "Unsupported println descriptor: %s\n", descriptor);
             }
         }
     }
@@ -915,64 +952,51 @@ static void handle_ldc(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
 
 static void handle_getstatic(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     (*pc)++; // Move past the GETSTATIC opcode
-    uint16_t index = (bytecode[*pc] << 8) | bytecode[*pc + 1]; // Read index from bytecode
-    (*pc) += 2; // Move past the index bytes
+    uint16_t index = (bytecode[*pc] << 8) | bytecode[*pc + 1];
+    (*pc) += 2;
 
-    // Validate constant pool index
     if (!validate_constant_pool_index(&jvm->class_file, index)) {
         fprintf(stderr, "GETSTATIC: Invalid constant pool index %d\n", index);
         return;
     }
 
-    // Get the Fieldref entry from constant pool
-    cp_info *const_pool_entry = &jvm->class_file.constant_pool[index - 1];
-    if (const_pool_entry->tag != CONSTANT_Fieldref) {
-        fprintf(stderr, "GETSTATIC: Constant pool entry at index %d is not a Fieldref\n", index);
+    cp_info *fieldref = &jvm->class_file.constant_pool[index - 1];
+    if (fieldref->tag != CONSTANT_Fieldref) {
+        fprintf(stderr, "GETSTATIC: Not a field reference\n");
         return;
     }
 
-    // Get class and field information
-    uint16_t class_index = const_pool_entry->info.Fieldref.class_index;
-    uint16_t name_and_type_index = const_pool_entry->info.Fieldref.name_and_type_index;
+    uint16_t class_index = fieldref->info.Fieldref.class_index;
+    uint16_t name_and_type_index = fieldref->info.Fieldref.name_and_type_index;
 
-    // Get class name
-    const char* class_name = get_constant_pool_string(&jvm->class_file, 
-        jvm->class_file.constant_pool[class_index - 1].info.Class.name_index);
-    
-    // Get field name from NameAndType
-    const char* field_name = get_constant_pool_string(&jvm->class_file, 
-        jvm->class_file.constant_pool[name_and_type_index - 1].info.NameAndType.name_index);
+    cp_info *class_info = &jvm->class_file.constant_pool[class_index - 1];
+    cp_info *name_and_type = &jvm->class_file.constant_pool[name_and_type_index - 1];
 
-    // Check if class is loaded
-    if (!jvm->loaded_class || strcmp(jvm->loaded_class->class_name, class_name) != 0) {
-        fprintf(stderr, "GETSTATIC: Class %s not loaded\n", class_name);
-        return;
-    }
+    const char *class_name = get_constant_pool_string(&jvm->class_file, 
+        class_info->info.Class.name_index);
+    const char *field_name = get_constant_pool_string(&jvm->class_file, 
+        name_and_type->info.NameAndType.name_index);
 
-    // Find static field
-    ClassFileElement *loaded_class = jvm->loaded_class;
-    FieldStatic *static_field = NULL;
-
-    // Search for the field in static fields
-    for (int i = 0; i < loaded_class->static_fields_count; ++i) {
-        const char* current_field_name = get_constant_pool_string(&jvm->class_file, 
-            loaded_class->class->fields[i].name_index);
-        if (strcmp(current_field_name, field_name) == 0) {
-            static_field = &loaded_class->static_fields[i];
-            break;
+    // Special handling for System.out
+    if (strcmp(class_name, "java/lang/System") == 0 && strcmp(field_name, "out") == 0) {
+        // Push a dummy reference for System.out
+        operand_stack_push(stack, 0xCAFEBABE);
+        printf("GETSTATIC: Pushed System.out reference\n");
+    } else if (jvm->loaded_class && strcmp(class_name, jvm->loaded_class->class_name) == 0) {
+        // Handle other static fields
+        for (int i = 0; i < jvm->loaded_class->static_fields_count; i++) {
+            const char* current_field_name = get_constant_pool_string(&jvm->class_file, 
+                jvm->loaded_class->class->fields[i].name_index);
+            if (strcmp(current_field_name, field_name) == 0) {
+                operand_stack_push(stack, jvm->loaded_class->static_fields[i].value);
+                printf("GETSTATIC: Pushed static field %s.%s value\n", class_name, field_name);
+                return;
+            }
         }
+        fprintf(stderr, "GETSTATIC: Field %s not found\n", field_name);
+    } else {
+        fprintf(stderr, "GETSTATIC: Class %s not loaded\n", class_name);
     }
-
-    if (!static_field) {
-        fprintf(stderr, "GETSTATIC: Static field %s.%s not found\n", class_name, field_name);
-        return;
-    }
-
-    // Push the static field's value onto the operand stack
-    operand_stack_push(stack, static_field->value);
-    
-    printf("GETSTATIC: Pushed static field %s.%s value: %d onto stack\n", 
-           class_name, field_name, static_field->value);
 }
 
 // ... more handler functions for each instruction
@@ -1041,6 +1065,7 @@ static void init_instruction_table(void) {
 
     instruction_table[DADD] = handle_dadd;
     instruction_table[DLOAD] = handle_dload;
+    instruction_table[DLOAD_0] = handle_dload;
     instruction_table[DLOAD_1] = handle_dload;
     instruction_table[DLOAD_2] = handle_dload;
     instruction_table[DLOAD_3] = handle_dload;
@@ -1079,9 +1104,11 @@ static void init_instruction_table(void) {
     instruction_table[LALOAD] = handle_laload;
 
     instruction_table[NOP] = handle_nop;
-    instruction_table[DSTORE_1] = handle_dstore_1;
-    instruction_table[DSTORE_2] = handle_dstore_2;
-    instruction_table[DSTORE_3] = handle_dstore_3;
+    
+    instruction_table[DSTORE_0] = handle_dstore;
+    instruction_table[DSTORE_1] = handle_dstore;
+    instruction_table[DSTORE_2] = handle_dstore;
+    instruction_table[DSTORE_3] = handle_dstore;
 
 
     instruction_table[DCMPL] = handle_dcmpl;
@@ -1200,13 +1227,15 @@ bool operand_stack_push(OperandStack *stack, int32_t value) {
     return true;
 }
 
-void operand_stack_push_cat2(OperandStack *stack, Cat2 val) {
+void operand_stack_push_cat2(OperandStack *stack, Cat2 value) {
     if (stack->size + 2 > stack->capacity) {
         fprintf(stderr, "Stack overflow in push_cat2\n");
         return;
     }
-    stack->values[stack->size++] = val.high;
-    stack->values[stack->size++] = val.low;
+    // Push high bits first, then low bits
+    stack->values[stack->size++] = value.high;
+    stack->values[stack->size++] = value.low;
+    printf("Push Cat2: high=%u, low=%u\n", value.high, value.low);
 }
 
 bool operand_stack_pop(OperandStack *stack, int32_t *value) {
@@ -1218,15 +1247,17 @@ bool operand_stack_pop(OperandStack *stack, int32_t *value) {
 }
 
 Cat2 operand_stack_pop_cat2(OperandStack *stack) {
-    Cat2 val;
+    Cat2 value;
     if (stack->size < 2) {
         fprintf(stderr, "Stack underflow in pop_cat2\n");
-        val.high = val.low = 0;
-        return val;
+        value.bytes = 0;
+        return value;
     }
-    val.low = stack->values[--stack->size];
-    val.high = stack->values[--stack->size];
-    return val;
+    // Pop in reverse order: low bits then high bits
+    value.low = stack->values[--stack->size];
+    value.high = stack->values[--stack->size];
+    printf("Pop Cat2: high=%u, low=%u\n", value.high, value.low);
+    return value;
 }
 
 void print_stack_state(OperandStack *stack) {
