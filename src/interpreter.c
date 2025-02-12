@@ -914,37 +914,49 @@ static void handle_ldc(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
 
 
 static void handle_getstatic(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
-    (*pc)++;
-    uint16_t index = (bytecode[*pc] << 8) | bytecode[*pc + 1];
-    (*pc) += 2;
+    (*pc)++; // Move past the GETSTATIC opcode
+    uint16_t index = (bytecode[*pc] << 8) | bytecode[*pc + 1]; // Read index from bytecode
+    (*pc) += 2; // Move past the index bytes
 
+    // Validate constant pool index
     if (!validate_constant_pool_index(&jvm->class_file, index)) {
         fprintf(stderr, "GETSTATIC: Invalid constant pool index %d\n", index);
         return;
     }
 
+    // Get the Fieldref entry from constant pool
     cp_info *const_pool_entry = &jvm->class_file.constant_pool[index - 1];
     if (const_pool_entry->tag != CONSTANT_Fieldref) {
         fprintf(stderr, "GETSTATIC: Constant pool entry at index %d is not a Fieldref\n", index);
         return;
     }
 
+    // Get class and field information
     uint16_t class_index = const_pool_entry->info.Fieldref.class_index;
     uint16_t name_and_type_index = const_pool_entry->info.Fieldref.name_and_type_index;
 
-    const char* class_name = get_constant_pool_string(&jvm->class_file, jvm->class_file.constant_pool[class_index - 1].info.Class.name_index);
-    const char* field_name = get_constant_pool_string(&jvm->class_file, jvm->class_file.constant_pool[name_and_type_index - 1].info.NameAndType.name_index);
+    // Get class name
+    const char* class_name = get_constant_pool_string(&jvm->class_file, 
+        jvm->class_file.constant_pool[class_index - 1].info.Class.name_index);
+    
+    // Get field name from NameAndType
+    const char* field_name = get_constant_pool_string(&jvm->class_file, 
+        jvm->class_file.constant_pool[name_and_type_index - 1].info.NameAndType.name_index);
 
+    // Check if class is loaded
     if (!jvm->loaded_class || strcmp(jvm->loaded_class->class_name, class_name) != 0) {
         fprintf(stderr, "GETSTATIC: Class %s not loaded\n", class_name);
         return;
     }
 
+    // Find static field
     ClassFileElement *loaded_class = jvm->loaded_class;
     FieldStatic *static_field = NULL;
 
+    // Search for the field in static fields
     for (int i = 0; i < loaded_class->static_fields_count; ++i) {
-        const char* current_field_name = get_constant_pool_string(&jvm->class_file, loaded_class->class->fields[i].name_index);
+        const char* current_field_name = get_constant_pool_string(&jvm->class_file, 
+            loaded_class->class->fields[i].name_index);
         if (strcmp(current_field_name, field_name) == 0) {
             static_field = &loaded_class->static_fields[i];
             break;
@@ -952,12 +964,15 @@ static void handle_getstatic(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandS
     }
 
     if (!static_field) {
-        fprintf(stderr, "GETSTATIC: Static field %s.%s not found or not static\n", class_name, field_name);
+        fprintf(stderr, "GETSTATIC: Static field %s.%s not found\n", class_name, field_name);
         return;
     }
 
+    // Push the static field's value onto the operand stack
     operand_stack_push(stack, static_field->value);
-    printf("GETSTATIC: Pushed static field %s.%s value: %d onto stack\n", class_name, field_name, static_field->value);
+    
+    printf("GETSTATIC: Pushed static field %s.%s value: %d onto stack\n", 
+           class_name, field_name, static_field->value);
 }
 
 // ... more handler functions for each instruction
