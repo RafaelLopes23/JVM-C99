@@ -9,7 +9,7 @@
 #define ARRAY_TYPE_LONG   11
 #define ARRAY_TYPE_FLOAT  6
 #define ARRAY_TYPE_DOUBLE 7
-
+#define ARRAY_TYPE_REF 15  
 
 typedef struct {
     uint8_t tag;
@@ -252,6 +252,9 @@ typedef enum {
     
     NEW = 0xBB,
     NEWARRAY = 0xBC,
+    ANEWARRAY = 0xBD,
+    MULTIANEWARRAY = 0xC5,
+    AALOAD = 0x32,
     IASTORE = 0x4F,
 
     // Method invocation
@@ -296,6 +299,11 @@ typedef enum {
     INVOKESPECIAL = 0xB7,
     CHECKCAST = 0xC0,
 
+    INVOKESTATIC = 0xB8,
+    AASTORE = 0x51,
+    ASTORE_1 = 0x4C,
+    ALOAD_1 = 0x2B,
+
     IRETURN = 0xB1,
     RETURN = 0xb1,
 
@@ -333,6 +341,7 @@ void operand_stack_init(OperandStack *stack, int capacity);
 bool validate_constant_pool_index(ClassFile *class_file, uint16_t index);
 void print_stack_state(OperandStack *stack);
 void print_local_vars(int32_t *local_vars);
+const char* get_string_constant(JVM *jvm, uint16_t index);
 
 typedef void (*instruction_handler)(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals);
 

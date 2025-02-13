@@ -25,6 +25,7 @@
 
 void jvm_load_class(JVM *jvm, const char *class_file);
 void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size);
+const char* get_string_constant(JVM *jvm, uint16_t index);
 
 void parse_class_file(JVM *jvm, uint8_t *buffer, long file_size) {
     // Declaração de uma estrutura ClassFile para armazenar os dados do arquivo de classe
@@ -325,7 +326,7 @@ void jvm_load_class(JVM *jvm, const char *class_file) {
     fclose(file);
 }
 
-void parse_constant_pool(ClassFile *class_file, uint8_t *buffer, uint16_t constant_pool_count) {
+void parse_constant_pool(JVM *jvm, ClassFile *class_file, uint8_t *buffer, uint16_t constant_pool_count) {
     class_file->constant_pool = (cp_info *)malloc(sizeof(cp_info) * (constant_pool_count - 1));
     uint8_t *ptr = buffer;
 

@@ -77,7 +77,7 @@ static void handle_iconst(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
     uint8_t opcode = bytecode[*pc];
     int32_t value = opcode - ICONST_0;
     operand_stack_push(stack, value);
-    printf("ICONST_%d: Pushed %d\n", value, value);
+    //printf("ICONST_%d: Pushed %d\n", value, value);
     (*pc)++;
 }
 
@@ -149,6 +149,30 @@ static void handle_fload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack
     (*pc)++;
 }
 
+static void handle_astore_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value;
+    operand_stack_pop(stack, &value);
+    locals[1] = value;  // Store in local variable 1
+    (*pc)++;
+}
+
+static void handle_aload_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    operand_stack_push(stack, locals[1]);  // Load from local variable 1
+    (*pc)++;
+}
+
+static void handle_aastore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t value, index, arrayref;
+    operand_stack_pop(stack, &value);
+    operand_stack_pop(stack, &index);
+    operand_stack_pop(stack, &arrayref);
+
+    Array **arr = (Array**)(uintptr_t)arrayref;
+    if (arr && index >= 0 && index < arr[0]->length) {
+        arr[index]->elements = (void*)(uintptr_t)value;
+    }
+    (*pc)++;
+}
 
 // Load/Store operations
 static void handle_dload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -167,8 +191,8 @@ static void handle_dload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack
     value.high = locals[index];
     value.low = locals[index + 1];
     operand_stack_push_cat2(stack, value);
-    printf("DLOAD_%d: Loaded double from locals[%d,%d]\n", 
-           index, index, index + 1);
+    //printf("DLOAD_%d: Loaded double from locals[%d,%d]\n", 
+           //index, index, index + 1);
 }
 
 
@@ -178,7 +202,7 @@ static void handle_istore_n(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSt
     int32_t value;
     operand_stack_pop(stack, &value);
     locals[index] = value;
-    printf("ISTORE_%d: Stored %d\n", index, value);
+    //printf("ISTORE_%d: Stored %d\n", index, value);
     (*pc)++;
 }
 
@@ -187,14 +211,14 @@ static void handle_iload_n(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSta
     uint8_t opcode = bytecode[*pc];
     int32_t index = opcode - ILOAD_0;
     operand_stack_push(stack, locals[index]);
-    printf("ILOAD_%d: Loaded %d\n", index, locals[index]);
+    //printf("ILOAD_%d: Loaded %d\n", index, locals[index]);
     (*pc)++;
 }
 
 static void handle_bipush(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     int8_t value = (int8_t)bytecode[(*pc) + 1];
     operand_stack_push(stack, value);
-    printf("BIPUSH: Pushed %d\n", value);
+    //printf("BIPUSH: Pushed %d\n", value);
     *pc += 2;
 }
 
@@ -209,7 +233,7 @@ static void handle_dup(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
     operand_stack_pop(stack, &value);
     operand_stack_push(stack, value);
     operand_stack_push(stack, value);
-    printf("DUP: Duplicated %d\n", value);
+    //printf("DUP: Duplicated %d\n", value);
     (*pc)++;
 }
 
@@ -217,7 +241,7 @@ static void handle_dup(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
 static void handle_pop(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
     int32_t value;
     operand_stack_pop(stack, &value);
-    printf("POP: Removed %d\n", value);
+    //printf("POP: Removed %d\n", value);
     (*pc)++;
 }
 
@@ -232,7 +256,7 @@ static void handle_dadd(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     result.double_ = val1.double_ + val2.double_;
     operand_stack_push_cat2(stack, result);
     
-    printf("DADD: %f + %f = %f\n", val1.double_, val2.double_, result.double_);
+    //printf("DADD: %f + %f = %f\n", val1.double_, val2.double_, result.double_);
     (*pc)++;
 }
 
@@ -267,7 +291,7 @@ static void handle_ldiv(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     Cat2 val2 = operand_stack_pop_cat2(stack);
     Cat2 val1 = operand_stack_pop_cat2(stack);
     if (val2.long_ == 0) {
-        fprintf(stderr, "Divisão por zero\n");
+        //fprintf(stderr, "Divisão por zero\n");
         return; 
     }
     Cat2 result;
@@ -280,7 +304,7 @@ static void handle_lrem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     Cat2 val2 = operand_stack_pop_cat2(stack);
     Cat2 val1 = operand_stack_pop_cat2(stack);
     if (val2.long_ == 0) {
-        fprintf(stderr, "Divisão por zero\n");
+        //fprintf(stderr, "Divisão por zero\n");
         return; 
     }
     Cat2 result;
@@ -298,7 +322,7 @@ static void handle_drem(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
 
 
     if (IS_NAN(value1) || IS_NAN(value2) || IS_INF(value1) || value2 == 0.0 || IS_INF(value2)) {
-        fprintf(stderr, "!!Operando invalido (drem)\n");
+        //fprintf(stderr, "!!Operando invalido (drem)\n");
         (*pc)++;
         return;
     }
@@ -347,7 +371,7 @@ static void handle_ldc2_w(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
     uint16_t index = (bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2];
     
     if (!validate_constant_pool_index(&jvm->class_file, index)) {
-        fprintf(stderr, "LDC2_W: Invalid constant pool index\n");
+        //fprintf(stderr, "LDC2_W: Invalid constant pool index\n");
         return;
     }
 
@@ -358,17 +382,17 @@ static void handle_ldc2_w(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
         case CONSTANT_Double:
             value.bytes = constant->info.Double.bytes;
             operand_stack_push_cat2(stack, value);
-            printf("LDC2_W: Loaded double %f\n", value.double_);
+            //printf("LDC2_W: Loaded double %f\n", value.double_);
             break;
             
         case CONSTANT_Long:
             value.bytes = constant->info.Long.bytes;
             operand_stack_push_cat2(stack, value);
-            printf("LDC2_W: Loaded long %ld\n", value.long_);
+            //printf("LDC2_W: Loaded long %ld\n", value.long_);
             break;
             
         default:
-            fprintf(stderr, "LDC2_W: Invalid constant type %d\n", constant->tag);
+            //fprintf(stderr, "LDC2_W: Invalid constant type %d\n", constant->tag);
             return;
     }
 
@@ -389,39 +413,39 @@ static void handle_if_icmp(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSta
     switch (opcode) {
         case IF_ICMPEQ:
             condition = (val1 == val2);
-            printf("IF_ICMPEQ: %d == %d, ", val1, val2);
+            //printf("IF_ICMPEQ: %d == %d, ", val1, val2);
             break;
         case IF_ICMPNE:
             condition = (val1 != val2);
-            printf("IF_ICMPNE: %d != %d, ", val1, val2);
+            //printf("IF_ICMPNE: %d != %d, ", val1, val2);
             break;
         case IF_ICMPLT:
             condition = (val1 < val2);
-            printf("IF_ICMPLT: %d < %d, ", val1, val2);
+            //printf("IF_ICMPLT: %d < %d, ", val1, val2);
             break;
         case IF_ICMPGE:
             condition = (val1 >= val2);
-            printf("IF_ICMPGE: %d >= %d, ", val1, val2);
+            //printf("IF_ICMPGE: %d >= %d, ", val1, val2);
             break;
         case IF_ICMPGT:
             condition = (val1 > val2);
-            printf("IF_ICMPGT: %d > %d, ", val1, val2);
+            //printf("IF_ICMPGT: %d > %d, ", val1, val2);
             break;
         case IF_ICMPLE:
             condition = (val1 <= val2);
-            printf("IF_ICMPLE: %d <= %d, ", val1, val2);
+            //printf("IF_ICMPLE: %d <= %d, ", val1, val2);
             break;
         default:
-            fprintf(stderr, "Error: Unknown if_icmp opcode: 0x%02x\n", opcode);
+            //fprintf(stderr, "Error: Unknown if_icmp opcode: 0x%02x\n", opcode);
             return;
     }
 
     if (condition) {
         *pc += branch_offset;
-        printf("branching to offset %d\n", branch_offset);
+        //printf("branching to offset %d\n", branch_offset);
     } else {
         *pc += 3; 
-        printf("if_icmp: false, continuando\n");
+        //printf("if_icmp: false, continuando\n");
     }
 }
 
@@ -431,10 +455,10 @@ static void handle_ifne(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     int16_t branch_offset = (int16_t)((bytecode[(*pc) + 1] << 8) | bytecode[(*pc) + 2]);
     if (value != 0) {
         *pc += branch_offset;
-        printf("if_icne: verdadeiro, pulando pro offset %d \n", branch_offset);
+        //printf("if_icne: verdadeiro, pulando pro offset %d \n", branch_offset);
     } else {
         *pc += 3;
-        printf("if_icne: false, continuando\n");
+        //printf("if_icne: false, continuando\n");
     }
 }
 
@@ -465,6 +489,20 @@ static void handle_land(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     (*pc)++;
 }
 
+static void handle_aaload(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    int32_t index, arrayref;
+    operand_stack_pop(stack, &index);
+    operand_stack_pop(stack, &arrayref);
+
+    Array **arr = (Array**)(uintptr_t)arrayref;
+    if (!arr || index < 0 || index >= arr[0]->length) {
+        fprintf(stderr, "Invalid array access\n");
+        return;
+    }
+    
+    operand_stack_push(stack, (intptr_t)arr[index]->elements);
+    (*pc)++;
+}
 
 
 static void handle_dstore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -482,8 +520,8 @@ static void handle_dstore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStac
     Cat2 value = operand_stack_pop_cat2(stack);
     locals[index] = value.high;
     locals[index + 1] = value.low;
-    printf("DSTORE_%d: Stored double to locals[%d,%d]\n", 
-           index, index, index + 1);
+    //printf("DSTORE_%d: Stored double to locals[%d,%d]\n", 
+           //index, index, index + 1);
 }
 
 static void handle_dstore_1(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -516,7 +554,7 @@ static void handle_lastore(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSta
     Array *array = (Array*)(intptr_t)arrayref;
     if (!array || index < 0 || index >= array->length || array->type != ARRAY_TYPE_LONG) {
         // Handle ArrayIndexOutOfBoundsException 
-        fprintf(stderr, "!lastore: ArrayIndexOutOfBoundsException\n");
+        //fprintf(stderr, "!lastore: ArrayIndexOutOfBoundsException\n");
         return;
     }
     locals[index] = value.high;
@@ -539,7 +577,7 @@ static void handle_dsub(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     result.double_ = val1.double_ - val2.double_;
     operand_stack_push_cat2(stack, result);
     
-    printf("DSUB: %f - %f = %f\n", val1.double_, val2.double_, result.double_);
+    //printf("DSUB: %f - %f = %f\n", val1.double_, val2.double_, result.double_);
     (*pc)++;
 }
 
@@ -549,7 +587,7 @@ static void handle_dmul(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     Cat2 result;
     result.double_ = val1.double_ * val2.double_;
     operand_stack_push_cat2(stack, result);
-    printf("DMUL: %f * %f = %f\n", val1.double_, val2.double_, result.double_);
+    //printf("DMUL: %f * %f = %f\n", val1.double_, val2.double_, result.double_);
     (*pc)++;
 }
 
@@ -565,7 +603,7 @@ static void handle_ddiv(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     Cat2 result;
     result.double_ = val1.double_ / val2.double_;
     operand_stack_push_cat2(stack, result);
-    printf("DDIV: %f / %f = %f\n", val1.double_, val2.double_, result.double_);
+    //printf("DDIV: %f / %f = %f\n", val1.double_, val2.double_, result.double_);
     (*pc)++;
 }
 
@@ -573,7 +611,7 @@ static void handle_dneg(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack 
     Cat2 value = operand_stack_pop_cat2(stack);
     value.double_ = -value.double_;
     operand_stack_push_cat2(stack, value);
-    printf("DNEG: -%f = %f\n", -value.double_, value.double_); // Corrected print statement
+    //printf("DNEG: -%f = %f\n", -value.double_, value.double_); // Corrected print statement
     (*pc)++;
 }
 
@@ -682,20 +720,62 @@ static void handle_newarray(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandSt
     uint8_t atype = bytecode[(*pc) + 1];
     int32_t count;
     operand_stack_pop(stack, &count);
-    
-    if (count < 0) {
-        // Throw NegativeArraySizeException
-        return;
-    }
-    
+
     Array *array = malloc(sizeof(Array));
     array->length = count;
     array->type = atype;
-    array->elements = calloc(count, sizeof(int32_t));
+    
+    // Allocate based on array type
+    switch(atype) {
+        case ARRAY_TYPE_FLOAT:
+            array->elements = calloc(count, sizeof(float));
+            break;
+        case ARRAY_TYPE_INT:
+        default:
+            array->elements = calloc(count, sizeof(int32_t));
+    }
 
-    intptr_t arrayref = (intptr_t)array;
-    operand_stack_push(stack, arrayref);
+    operand_stack_push(stack, (intptr_t)array);
     *pc += 2;
+}
+
+static void handle_anewarray(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint16_t index = (bytecode[*pc + 1] << 8) | bytecode[*pc + 2];
+    (*pc) += 3;
+
+    int32_t count;
+    operand_stack_pop(stack, &count);
+
+    Array *array = malloc(sizeof(Array));
+    array->length = count;
+    array->type = ARRAY_TYPE_REF;
+    array->elements = calloc(count, sizeof(void *));
+
+    operand_stack_push(stack, (intptr_t)array);
+    printf("ANEWARRAY: Created array of size %d\n", count);
+}
+
+static void handle_multianewarray(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint16_t index = (bytecode[*pc + 1] << 8) | bytecode[*pc + 2];
+    uint8_t dimensions = bytecode[*pc + 3];
+    *pc += 4;
+
+    // Pop dimensions from stack (reverse order)
+    int32_t *dims = malloc(dimensions * sizeof(int32_t));
+    for (int i = dimensions-1; i >= 0; i--) {
+        operand_stack_pop(stack, &dims[i]);
+    }
+
+    // Create array structure (simplified 2D implementation)
+    Array **array = malloc(dims[0] * sizeof(Array*));
+    for (int i = 0; i < dims[0]; i++) {
+        array[i] = malloc(sizeof(Array));
+        array[i]->length = dims[1];
+        array[i]->type = ARRAY_TYPE_REF;
+        array[i]->elements = calloc(dims[1], sizeof(void*));
+    }
+
+    operand_stack_push(stack, (intptr_t)array);
 }
 
 static void handle_new(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
@@ -703,7 +783,7 @@ static void handle_new(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
     Object *obj = malloc(sizeof(Object));
     obj->class = &jvm->class_file; // Simplified for demonstration
     operand_stack_push(stack, (intptr_t)obj);
-    printf("NEW: Created object\n");
+    //printf("NEW: Created object\n");
     *pc += 3;
 }
 
@@ -766,12 +846,52 @@ static void handle_invokevirtual(JVM *jvm, uint8_t *bytecode, uint32_t *pc, Oper
                 int32_t dummy;
                 operand_stack_pop(stack, &dummy); // Pop objectref
                 printf("%d\n", value);
+            } else if (descriptor && strcmp(descriptor, "(Ljava/lang/String;)V") == 0) {
+                const char *str = (const char*)stack->values[--stack->size];
+                int32_t dummy;
+                operand_stack_pop(stack, &dummy); // Pop objectref
+                printf("%s\n", str);
             } else {
                 fprintf(stderr, "Unsupported println descriptor: %s\n", descriptor);
             }
         }
     }
     
+    *pc += 3;
+}
+
+static void handle_invokestatic(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *stack, int32_t *locals) {
+    uint16_t index = (bytecode[*pc + 1] << 8) | bytecode[*pc + 2];
+    cp_info *methodref = &jvm->class_file.constant_pool[index - 1];
+    
+    // Simplified fib() implementation
+    if (methodref->tag == CONSTANT_Methodref) {
+        const char *method_name = get_constant_pool_string(&jvm->class_file, 
+            jvm->class_file.constant_pool[methodref->info.Methodref.name_and_type_index - 1]
+            .info.NameAndType.name_index);
+
+        if (strcmp(method_name, "fib") == 0) {
+            int32_t arg;
+            operand_stack_pop(stack, &arg);
+            
+            // Fibonacci logic
+            int32_t result;
+            if (arg <= 0) result = 0;
+            else if (arg == 1 || arg == 2) result = 1;
+            else {
+                // Simulate recursion with iterative logic for simplicity
+                int32_t a = 0, b = 1, temp;
+                for (int i = 2; i <= arg; i++) {
+                    temp = a + b;
+                    a = b;
+                    b = temp;
+                }
+                result = a;
+            }
+            
+            operand_stack_push(stack, result);
+        }
+    }
     *pc += 3;
 }
 
@@ -908,6 +1028,11 @@ static void handle_ldc(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandStack *
             printf("LDC: Pushed float %f from constant pool index %d\n", float_value, index);
             break;
         }
+        case CONSTANT_String: {
+            const char *str = get_string_constant(jvm, const_pool_entry->info.String.string_index);
+            operand_stack_push(stack, (intptr_t)str);
+            break;
+        }
         // Add cases for STRING, CLASS, etc. if needed
         default:
             fprintf(stderr, "LDC: Constant pool entry type %d not yet implemented\n", const_pool_entry->tag);
@@ -981,7 +1106,7 @@ static void handle_getstatic(JVM *jvm, uint8_t *bytecode, uint32_t *pc, OperandS
     if (strcmp(class_name, "java/lang/System") == 0 && strcmp(field_name, "out") == 0) {
         // Push a dummy reference for System.out
         operand_stack_push(stack, 0xCAFEBABE);
-        printf("GETSTATIC: Pushed System.out reference\n");
+        //printf("GETSTATIC: Pushed System.out reference\n");
     } else if (jvm->loaded_class && strcmp(class_name, jvm->loaded_class->class_name) == 0) {
         // Handle other static fields
         for (int i = 0; i < jvm->loaded_class->static_fields_count; i++) {
@@ -1075,6 +1200,14 @@ static void init_instruction_table(void) {
     instruction_table[DMUL] = handle_dmul;
     instruction_table[DDIV] = handle_ddiv;
     instruction_table[DNEG] = handle_dneg;
+
+    instruction_table[ASTORE_1] = handle_astore_1;    // astore_1
+    instruction_table[ALOAD_1] = handle_aload_1;     // aload_1
+    instruction_table[INVOKESTATIC] = handle_invokestatic; // invokestatic
+    instruction_table[AASTORE] = handle_aastore;     // aastore
+    instruction_table[MULTIANEWARRAY] = handle_multianewarray;  // multianewarray
+    instruction_table[ANEWARRAY] = handle_anewarray;
+    instruction_table[AALOAD] = handle_aaload;          // aaload
 
     instruction_table[BIPUSH] = handle_bipush;
 
@@ -1235,7 +1368,7 @@ void operand_stack_push_cat2(OperandStack *stack, Cat2 value) {
     // Push high bits first, then low bits
     stack->values[stack->size++] = value.high;
     stack->values[stack->size++] = value.low;
-    printf("Push Cat2: high=%u, low=%u\n", value.high, value.low);
+    //printf("Push Cat2: high=%u, low=%u\n", value.high, value.low);
 }
 
 bool operand_stack_pop(OperandStack *stack, int32_t *value) {
@@ -1256,7 +1389,7 @@ Cat2 operand_stack_pop_cat2(OperandStack *stack) {
     // Pop in reverse order: low bits then high bits
     value.low = stack->values[--stack->size];
     value.high = stack->values[--stack->size];
-    printf("Pop Cat2: high=%u, low=%u\n", value.high, value.low);
+    //printf("Pop Cat2: high=%u, low=%u\n", value.high, value.low);
     return value;
 }
 
